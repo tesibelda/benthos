@@ -41,11 +41,12 @@ func TestIntegrationElasticsearchV8(t *testing.T) {
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	pool.MaxWait = time.Second * 30
+	pool.MaxWait = time.Minute * 3
 	resource, err := pool.Run("elasticsearch", "8.1.2", []string{
 		"discovery.type=single-node",
 		"xpack.security.enabled=false",
 		"xpack.security.http.ssl.enabled=false",
+		"ES_JAVA_OPTS=-Xms512m -Xmx512m", // By default ES immediately gobbles half the available RAM, what a psychopath.
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -123,9 +124,10 @@ func TestIntegrationElasticsearchV7(t *testing.T) {
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 
-	pool.MaxWait = time.Second * 60
+	pool.MaxWait = time.Minute * 3
 	resource, err := pool.Run("elasticsearch", "7.17.2", []string{
 		"discovery.type=single-node",
+		"ES_JAVA_OPTS=-Xms512m -Xmx512m", // By default ES immediately gobbles half the available RAM, what a psychopath.
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -202,9 +204,10 @@ func BenchmarkIntegrationElasticsearch(b *testing.B) {
 	pool, err := dockertest.NewPool("")
 	require.NoError(b, err)
 
-	pool.MaxWait = time.Second * 30
+	pool.MaxWait = time.Minute * 3
 	resource, err := pool.Run("elasticsearch", "7.13.4", []string{
 		"discovery.type=single-node",
+		"ES_JAVA_OPTS=-Xms512m -Xmx512m", // By default ES immediately gobbles half the available RAM, what a psychopath.
 	})
 	require.NoError(b, err)
 	b.Cleanup(func() {

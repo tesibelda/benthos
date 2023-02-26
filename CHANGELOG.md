@@ -7,17 +7,59 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- New `nats_kv` processor, input and output.
+
+## 4.12.1 - 2023-02-23
+
+### Fixed
+
+- Fixed a regression bug in the `nats` components where panics occur during a flood of messages. This issue was introduced in v4.12.0 (45f785a).
+
+## 4.12.0 - 2023-02-20
+
+### Added
+
 - Format `csv:x` added to the `unarchive` processor.
 - Field `max_buffer` added to the `aws_s3` input.
 - Field `open_message_type` added to the `websocket` input.
 - The experimental `--watcher` cli flag now takes into account file deletions and new files that match wildcard patterns.
+- Field `dump_request_log_level` added to HTTP components.
+- New `couchbase` cache implementation.
+- New `compress` and `decompress` Bloblang methods.
+- Field `endpoint` added to the `gcp_pubsub` input and output.
+- Fields `file_name`, `file_extension` and `request_id` added to the `snowflake_put` output.
+- Add interpolation support to the `path` field of the `snowflake_put` output.
+- Add ZSTD compression support to the `compression` field of the `snowflake_put` output.
+- New Bloblang method `concat`.
+- New `redis` ratelimit.
+- The `socket_server` input now supports `tls` as a network type.
+- New bloblang function `timestamp_unix_milli`.
+- New bloblang method `ts_unix_milli`.
+- JWT based HTTP authentication now supports `EdDSA`.
+- New `flow_control` fields added to the `gcp_pubsub` output.
+- Added bloblang methods `sign_jwt_hs256`, `sign_jwt_hs384` and `sign_jwt_hs512`
+- New bloblang methods `parse_jwt_hs256`, `parse_jwt_hs384`, `parse_jwt_hs512`.
+- The `open_telemetry_collector` tracer now automatically sets the `service.name` and `service.version` tags if they are not configured by the user.
+- New bloblang string methods `trim_prefix` and `trim_suffix`.
 
 ### Fixed
 
+- Fixed an issue where messages caught in a retry loop from inputs that do not support nacks (`generate`, `kafka`, `file`, etc) could be retried in their post-mutation form from the `switch` output rather than the original copy of the message.
 - The `sqlite` buffer should no longer print `Failed to ack buffer message` logs during graceful termination.
 - The default value of the `conn_max_idle` field has been changed from 0 to 2 for all `sql_*` components in accordance
 to the [`database/sql` docs](https://pkg.go.dev/database/sql#DB.SetMaxIdleConns).
 - The `parse_csv` bloblang method with `parse_header_row` set to `false` no longer produces rows that are of an `unknown` type.
+- Fixed a bug where the `oracle` driver for the `sql_*` components was returning timestamps which were getting marshalled into an empty JSON object instead of a string.
+- The `aws_sqs` input no longer backs off on subsequent empty requests when long polling is enabled.
+- It's now possible to mock resources within the main test target file in config unit tests.
+- Unit test linting no longer incorrectly expects the `json_contains` predicate to contain a string value only.
+- Config component initialisation errors should no longer show nested path annotations.
+- Prevented panics from the `jq` processor when querying invalid types.
+- The `jaeger` tracer no longer emits the `service.version` tag automatically if the user sets the `service.name` tag explicitly.
+- The `int64()`, `int32()`, `uint64()` and `uint32()` bloblang methods can now infer the number base as documented [here](https://pkg.go.dev/strconv#ParseInt).
+- The `mapping` and `mutation` processors should provide metrics and tracing events again.
+- Fixed a data race in the `redis_streams` input.
+- Upgraded the Redis components to `github.com/redis/go-redis/v9`.
 
 ## 4.11.0 - 2022-12-21
 
