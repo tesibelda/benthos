@@ -1,12 +1,11 @@
 package docs
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/benthosdev/benthos/v4/internal/bloblang"
-	"github.com/benthosdev/benthos/v4/internal/bloblang/query"
-	"github.com/benthosdev/benthos/v4/internal/message"
+	"github.com/benthosdev/benthos/v4/public/bloblang"
 )
 
 // FieldType represents a field type.
@@ -162,7 +161,7 @@ func (f FieldSpec) Optional() FieldSpec {
 	return f
 }
 
-const bloblREEnvVar = "\\${[0-9A-Za-z_.]+(:((\\${[^}]+})|[^}])+)?}"
+const bloblREEnvVar = "\\${[0-9A-Za-z_.]+(:((\\${[^}]+})|[^}])*)?}"
 
 // Secret marks this field as being a secret, which means it represents
 // information that is generally considered sensitive such as passwords or
@@ -292,6 +291,7 @@ func (f FieldSpec) OmitWhen(fn func(field, parent any) (why string, shouldOmit b
 // binary that defines it as the function cannot be serialized into a portable
 // schema.
 func (f FieldSpec) LinterFunc(fn LintFunc) FieldSpec {
+	f.Linter = ""
 	f.customLintFn = fn
 	return f
 }
@@ -303,7 +303,11 @@ func lintsFromAny(line int, v any) (lints []Lint) {
 			lints = append(lints, lintsFromAny(line, e)...)
 		}
 	case map[string]any:
-		typeInt, _ := query.IGetInt(t["type"])
+		// Note: this is a long winded way to do IGetInt from the internal
+		// package, I'm doing it so that this package no longer depends on other
+		// internal packages (when possible).
+		var typeInt int64
+		_ = bloblang.NewArgSpec().Int64Var(&typeInt).Extract([]any{t["type"]})
 		lints = append(lints, NewLintError(line, LintType(typeInt), t["what"].(string)))
 	case string:
 		if len(t) > 0 {
@@ -330,7 +334,7 @@ func lintsFromAny(line int, v any) (lints []Lint) {
 func (f FieldSpec) LinterBlobl(blobl string) FieldSpec {
 	env := bloblang.NewEnvironment().OnlyPure()
 
-	m, err := env.NewMapping(blobl)
+	m, err := env.Parse(blobl)
 	if err != nil {
 		f.customLintFn = func(ctx LintContext, line, col int, value any) (lints []Lint) {
 			return []Lint{NewLintError(line, LintCustom, fmt.Sprintf("Field lint mapping itself failed to parse: %v", err))}
@@ -340,12 +344,12 @@ func (f FieldSpec) LinterBlobl(blobl string) FieldSpec {
 
 	f.Linter = blobl
 	f.customLintFn = func(ctx LintContext, line, col int, value any) (lints []Lint) {
-		res, err := m.Exec(query.FunctionContext{
-			Vars:     map[string]any{},
-			Maps:     m.Maps(),
-			MsgBatch: message.QuickBatch(nil),
-		}.WithValue(value))
+		var res any
+		err := m.Overlay(value, &res)
 		if err != nil {
+			if errors.Is(err, bloblang.ErrRootDeleted) {
+				return
+			}
 			return []Lint{NewLintError(line, LintCustom, err.Error())}
 		}
 		lints = append(lints, lintsFromAny(line, res)...)
@@ -383,22 +387,20 @@ func (f FieldSpec) lintOptions() FieldSpec {
 	_, _ = optionsBuilder.WriteString("}\n")
 	_, _ = patternOptionsBuilder.WriteString("}\n")
 
-	return f.LinterBlobl(fmt.Sprintf(`
+	f.Linter = fmt.Sprintf(`
 let options = %v
-
 map is_pattern_option {
   let pattern_options = %v
   let parts = this.split(":")
   root = $parts.length() == 2 && $pattern_options.exists($parts.index(0))
 }
-
 # Codec arguments can be chained with a / (i.e. "lines/multipart")
 let value_parts = if this.type() == "string" { this.split("/").map_each(part -> part.lowercase()) } else { [] }
-
 root = $value_parts.map_each(part -> if $options.exists(part) || part.apply("is_pattern_option") { null } else {
   {"type": 2, "what": "value %%v is not a valid option for this field".format(part)}
 }).filter(ele -> ele != null)
-`, optionsBuilder.String(), patternOptionsBuilder.String()))
+`, optionsBuilder.String(), patternOptionsBuilder.String())
+	return f
 }
 
 func (f FieldSpec) scrubValue(v any) (any, error) {
@@ -408,28 +410,19 @@ func (f FieldSpec) scrubValue(v any) (any, error) {
 
 	env := bloblang.NewEnvironment().OnlyPure()
 
-	m, err := env.NewMapping(f.Scrubber)
+	m, err := env.Parse(f.Scrubber)
 	if err != nil {
 		return nil, fmt.Errorf("scrubber mapping failed to parse: %w", err)
 	}
 
-	res, err := m.Exec(query.FunctionContext{
-		Vars:     map[string]any{},
-		Maps:     map[string]query.Function{},
-		MsgBatch: message.QuickBatch(nil),
-	}.WithValue(v))
+	res, err := m.Query(v)
 	if err != nil {
+		if errors.Is(err, bloblang.ErrRootDeleted) {
+			return nil, nil
+		}
 		return nil, err
 	}
-
-	switch res.(type) {
-	case query.Delete:
-		return nil, nil
-	case query.Nothing:
-		return v, nil
-	default:
-		return res, nil
-	}
+	return res, nil
 }
 
 func (f FieldSpec) getLintFunc() LintFunc {
@@ -439,8 +432,9 @@ func (f FieldSpec) getLintFunc() LintFunc {
 	}
 	if f.Interpolated {
 		if fn != nil {
+			innerFn := fn
 			fn = func(ctx LintContext, line, col int, value any) []Lint {
-				lints := f.customLintFn(ctx, line, col, value)
+				lints := innerFn(ctx, line, col, value)
 				moreLints := LintBloblangField(ctx, line, col, value)
 				return append(lints, moreLints...)
 			}
@@ -450,8 +444,9 @@ func (f FieldSpec) getLintFunc() LintFunc {
 	}
 	if f.Bloblang {
 		if fn != nil {
+			innerFn := fn
 			fn = func(ctx LintContext, line, col int, value any) []Lint {
-				lints := f.customLintFn(ctx, line, col, value)
+				lints := innerFn(ctx, line, col, value)
 				moreLints := LintBloblangMapping(ctx, line, col, value)
 				return append(lints, moreLints...)
 			}

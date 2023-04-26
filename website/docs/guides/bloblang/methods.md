@@ -193,6 +193,56 @@ root.title = this.title.capitalize()
 # Out: {"title":"The Foo Bar"}
 ```
 
+### `compare_argon2`
+
+Checks whether a string matches a hashed secret using Argon2.
+
+#### Parameters
+
+**`hashed_secret`** &lt;string&gt; The hashed secret to compare with the input. This must be a fully-qualified string which encodes the Argon2 options used to generate the hash.  
+
+#### Examples
+
+
+```coffee
+root.match = this.secret.compare_argon2("$argon2id$v=19$m=4096,t=3,p=1$c2FsdHktbWNzYWx0ZmFjZQ$RMUMwgtS32/mbszd+ke4o4Ej1jFpYiUqY6MHWa69X7Y")
+
+# In:  {"secret":"there-are-many-blobs-in-the-sea"}
+# Out: {"match":true}
+```
+
+```coffee
+root.match = this.secret.compare_argon2("$argon2id$v=19$m=4096,t=3,p=1$c2FsdHktbWNzYWx0ZmFjZQ$RMUMwgtS32/mbszd+ke4o4Ej1jFpYiUqY6MHWa69X7Y")
+
+# In:  {"secret":"will-i-ever-find-love"}
+# Out: {"match":false}
+```
+
+### `compare_bcrypt`
+
+Checks whether a string matches a hashed secret using bcrypt.
+
+#### Parameters
+
+**`hashed_secret`** &lt;string&gt; The hashed secret value to compare with the input.  
+
+#### Examples
+
+
+```coffee
+root.match = this.secret.compare_bcrypt("$2y$10$Dtnt5NNzVtMCOZONT705tOcS8It6krJX8bEjnDJnwxiFKsz1C.3Ay")
+
+# In:  {"secret":"there-are-many-blobs-in-the-sea"}
+# Out: {"match":true}
+```
+
+```coffee
+root.match = this.secret.compare_bcrypt("$2y$10$Dtnt5NNzVtMCOZONT705tOcS8It6krJX8bEjnDJnwxiFKsz1C.3Ay")
+
+# In:  {"secret":"will-i-ever-find-love"}
+# Out: {"match":false}
+```
+
 ### `contains`
 
 Checks whether a string contains a substring and returns a boolean result.
@@ -275,7 +325,7 @@ root.path_sep = this.path.filepath_split()
 
 ### `format`
 
-Use a value string as a format specifier in order to produce a new string, using any number of provided arguments.
+Use a value string as a format specifier in order to produce a new string, using any number of provided arguments. Please refer to the Go [`fmt` package documentation](https://pkg.go.dev/fmt) for the list of valid format verbs.
 
 #### Examples
 
@@ -376,6 +426,60 @@ root.foo = this.foo.lowercase()
 
 # In:  {"foo":"HELLO WORLD"}
 # Out: {"foo":"hello world"}
+```
+
+### `parse_jwt_hs256`
+
+Parses a claims object from a JWT string encoded with HS256. This method does not validate JWT claims.
+
+#### Parameters
+
+**`signing_secret`** &lt;string&gt; The HMAC secret that was used for signing the token.  
+
+#### Examples
+
+
+```coffee
+root.claims = this.signed.parse_jwt_hs256("dont-tell-anyone")
+
+# In:  {"signed":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.hUl-nngPMY_3h9vveWJUPsCcO5PeL6k9hWLnMYeFbFQ"}
+# Out: {"claims":{"sub":"user123"}}
+```
+
+### `parse_jwt_hs384`
+
+Parses a claims object from a JWT string encoded with HS384. This method does not validate JWT claims.
+
+#### Parameters
+
+**`signing_secret`** &lt;string&gt; The HMAC secret that was used for signing the token.  
+
+#### Examples
+
+
+```coffee
+root.claims = this.signed.parse_jwt_hs384("dont-tell-anyone")
+
+# In:  {"signed":"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.zGYLr83aToon1efUNq-hw7XgT20lPvZb8sYei8x6S6mpHwb433SJdXJXx0Oio8AZ"}
+# Out: {"claims":{"sub":"user123"}}
+```
+
+### `parse_jwt_hs512`
+
+Parses a claims object from a JWT string encoded with HS512. This method does not validate JWT claims.
+
+#### Parameters
+
+**`signing_secret`** &lt;string&gt; The HMAC secret that was used for signing the token.  
+
+#### Examples
+
+
+```coffee
+root.claims = this.signed.parse_jwt_hs512("dont-tell-anyone")
+
+# In:  {"signed":"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.zBNR9o_6EDwXXKkpKLNJhG26j8Dc-mV-YahBwmEdCrmiWt5les8I9rgmNlWIowpq6Yxs4kLNAdFhqoRz3NXT3w"}
+# Out: {"claims":{"sub":"user123"}}
 ```
 
 ### `quote`
@@ -582,6 +686,50 @@ root.description = this.description.trim()
 
 # In:  {"description":"  something happened and its amazing! ","title":"!!!watch out!?"}
 # Out: {"description":"something happened and its amazing!","title":"watch out"}
+```
+
+### `trim_prefix`
+
+Remove the provided leading prefix substring from a string. If the string does not have the prefix substring, it is returned unchanged.
+
+Introduced in version 4.12.0.
+
+
+#### Parameters
+
+**`prefix`** &lt;string&gt; The leading prefix substring to trim from the string.  
+
+#### Examples
+
+
+```coffee
+root.name = this.name.trim_prefix("foobar_")
+root.description = this.description.trim_prefix("foobar_")
+
+# In:  {"description":"unchanged","name":"foobar_blobton"}
+# Out: {"description":"unchanged","name":"blobton"}
+```
+
+### `trim_suffix`
+
+Remove the provided trailing suffix substring from a string. If the string does not have the suffix substring, it is returned unchanged.
+
+Introduced in version 4.12.0.
+
+
+#### Parameters
+
+**`suffix`** &lt;string&gt; The trailing suffix substring to trim from the string.  
+
+#### Examples
+
+
+```coffee
+root.name = this.name.trim_suffix("_foobar")
+root.description = this.description.trim_suffix("_foobar")
+
+# In:  {"description":"unchanged","name":"blobton_foobar"}
+# Out: {"description":"unchanged","name":"blobton"}
 ```
 
 ### `unescape_html`
@@ -823,7 +971,7 @@ root.new_value = this.value.floor()
 
 Converts a numerical type into a 32-bit signed integer, this is for advanced use cases where a specific data type is needed for a given component (such as the ClickHouse SQL driver).
 
-If the value is a string then an attempt will be made to parse it as a 32-bit integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first.
+If the value is a string then an attempt will be made to parse it as a 32-bit integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first. Please refer to the [`strconv.ParseInt` documentation](https://pkg.go.dev/strconv#ParseInt) for details regarding the supported formats.
 
 #### Examples
 
@@ -839,12 +987,21 @@ root.c = this.c.int32()
 # Out: {"a":12,"b":12,"c":12}
 ```
 
+```coffee
+
+root = this.int32()
+
+
+# In:  "0xB70B"
+# Out: 46859
+```
+
 ### `int64`
 
 
 Converts a numerical type into a 64-bit signed integer, this is for advanced use cases where a specific data type is needed for a given component (such as the ClickHouse SQL driver).
 
-If the value is a string then an attempt will be made to parse it as a 64-bit integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first.
+If the value is a string then an attempt will be made to parse it as a 64-bit integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first. Please refer to the [`strconv.ParseInt` documentation](https://pkg.go.dev/strconv#ParseInt) for details regarding the supported formats.
 
 #### Examples
 
@@ -858,6 +1015,15 @@ root.c = this.c.int64()
 
 # In:  {"a":12,"b":12.34,"c":"12"}
 # Out: {"a":12,"b":12,"c":12}
+```
+
+```coffee
+
+root = this.int64()
+
+
+# In:  "0xDEADBEEF"
+# Out: 3735928559
 ```
 
 ### `log`
@@ -964,7 +1130,7 @@ root.new_value = this.value.round()
 
 Converts a numerical type into a 32-bit unsigned integer, this is for advanced use cases where a specific data type is needed for a given component (such as the ClickHouse SQL driver).
 
-If the value is a string then an attempt will be made to parse it as a 32-bit unsigned integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first.
+If the value is a string then an attempt will be made to parse it as a 32-bit unsigned integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first. Please refer to the [`strconv.ParseInt` documentation](https://pkg.go.dev/strconv#ParseInt) for details regarding the supported formats.
 
 #### Examples
 
@@ -981,12 +1147,21 @@ root.d = this.d.uint32().catch(0)
 # Out: {"a":12,"b":12,"c":12,"d":0}
 ```
 
+```coffee
+
+root = this.uint32()
+
+
+# In:  "0xB70B"
+# Out: 46859
+```
+
 ### `uint64`
 
 
 Converts a numerical type into a 64-bit unsigned integer, this is for advanced use cases where a specific data type is needed for a given component (such as the ClickHouse SQL driver).
 
-If the value is a string then an attempt will be made to parse it as a 64-bit unsigned integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first.
+If the value is a string then an attempt will be made to parse it as a 64-bit unsigned integer. If the target value exceeds the capacity of an integer or contains decimal values then this method will throw an error. In order to convert a floating point number containing decimals first use [`.round()`](#round) on the value first. Please refer to the [`strconv.ParseInt` documentation](https://pkg.go.dev/strconv#ParseInt) for details regarding the supported formats.
 
 #### Examples
 
@@ -1001,6 +1176,15 @@ root.d = this.d.uint64().catch(0)
 
 # In:  {"a":12,"b":12.34,"c":"12","d":-12}
 # Out: {"a":12,"b":12,"c":12,"d":0}
+```
+
+```coffee
+
+root = this.uint64()
+
+
+# In:  "0xDEADBEEF"
+# Out: 3735928559
 ```
 
 ## Timestamp Manipulation
@@ -1062,6 +1246,17 @@ root.delay_for_s = this.delay_for.parse_duration_iso8601() / 1000000000
 # In:  {"delay_for":"PT2.5S"}
 # Out: {"delay_for_s":2.5}
 ```
+
+### `ts_add_iso8601`
+
+:::caution BETA
+This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
+:::
+Parse parameter string as ISO 8601 period and add it to value with high precision for units larger than an hour.
+
+#### Parameters
+
+**`duration`** &lt;string&gt; Duration in ISO 8601 format  
 
 ### `ts_format`
 
@@ -1240,6 +1435,17 @@ root.doc.timestamp = this.doc.timestamp.ts_strptime("%Y-%b-%d %H:%M:%S.%f")
 # Out: {"doc":{"timestamp":"2020-08-14T11:50:26.371Z"}}
 ```
 
+### `ts_sub_iso8601`
+
+:::caution BETA
+This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
+:::
+Parse parameter string as ISO 8601 period and subtract it from value with high precision for units larger than an hour.
+
+#### Parameters
+
+**`duration`** &lt;string&gt; Duration in ISO 8601 format  
+
 ### `ts_tz`
 
 :::caution BETA
@@ -1279,6 +1485,40 @@ root.created_at_unix = this.created_at.ts_unix()
 
 # In:  {"created_at":"2009-11-10T23:00:00Z"}
 # Out: {"created_at_unix":1257894000}
+```
+
+### `ts_unix_micro`
+
+:::caution BETA
+This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
+:::
+Attempts to format a timestamp value as a unix timestamp with microsecond precision. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.
+
+#### Examples
+
+
+```coffee
+root.created_at_unix = this.created_at.ts_unix_micro()
+
+# In:  {"created_at":"2009-11-10T23:00:00Z"}
+# Out: {"created_at_unix":1257894000000000}
+```
+
+### `ts_unix_milli`
+
+:::caution BETA
+This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
+:::
+Attempts to format a timestamp value as a unix timestamp with millisecond precision. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.
+
+#### Examples
+
+
+```coffee
+root.created_at_unix = this.created_at.ts_unix_milli()
+
+# In:  {"created_at":"2009-11-10T23:00:00Z"}
+# Out: {"created_at_unix":1257894000000}
 ```
 
 ### `ts_unix_nano`
@@ -1567,6 +1807,20 @@ root.result = this.collapse(include_empty: true)
 # Out: {"result":{"foo.0.bar":"1","foo.1.bar":{},"foo.2.bar":"2","foo.3.bar":[]}}
 ```
 
+### `concat`
+
+Concatenates an array value with one or more argument arrays.
+
+#### Examples
+
+
+```coffee
+root.foo = this.foo.concat(this.bar, this.baz)
+
+# In:  {"foo":["a","b"],"bar":["c"],"baz":["d","e","f"]}
+# Out: {"foo":["a","b","c","d","e","f"]}
+```
+
 ### `contains`
 
 Checks whether an array contains an element matching the argument, or an object contains a value matching the argument, and returns a boolean result. Numerical comparisons are made irrespective of the representation type (float versus integer).
@@ -1679,11 +1933,11 @@ root.new_dict = this.dict.filter(item -> item.value.contains("foo"))
 :::caution BETA
 This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
 :::
-Returns the index of the first occurrence of a value or query in an array. `-1` is returned if there are no matches. Numerical comparisons are made irrespective of the representation type (float versus integer).
+Returns the index of the first occurrence of a value an array. `-1` is returned if there are no matches. Numerical comparisons are made irrespective of the representation type (float versus integer).
 
 #### Parameters
 
-**`value`** &lt;query expression&gt; A value to find. If a query is provided it will only be resolved once during the lifetime of the mapping.  
+**`value`** &lt;unknown&gt; A value to find.  
 
 #### Examples
 
@@ -1696,17 +1950,10 @@ root.index = this.find("bar")
 ```
 
 ```coffee
-root.index = this.find(v -> v != "bar")
+root.index = this.things.find(this.goal)
 
-# In:  ["foo", "bar", "baz"]
-# Out: {"index":0}
-```
-
-```coffee
-root.index = this.find(v -> v != "foo")
-
-# In:  ["foo"]
-# Out: {"index":-1}
+# In:  {"goal":"bar","things":["foo", "bar", "baz"]}
+# Out: {"index":1}
 ```
 
 ### `find_all`
@@ -1714,11 +1961,11 @@ root.index = this.find(v -> v != "foo")
 :::caution BETA
 This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
 :::
-Returns an array containing the indexes of all occurrences of a value or query in an array. An empty array is returned if there are no matches. Numerical comparisons are made irrespective of the representation type (float versus integer).
+Returns an array containing the indexes of all occurrences of a value in an array. An empty array is returned if there are no matches. Numerical comparisons are made irrespective of the representation type (float versus integer).
 
 #### Parameters
 
-**`value`** &lt;query expression&gt; A value to find. If a query is provided it will only be resolved once during the lifetime of the mapping.  
+**`value`** &lt;unknown&gt; A value to find.  
 
 #### Examples
 
@@ -1731,17 +1978,52 @@ root.index = this.find_all("bar")
 ```
 
 ```coffee
-root.index = this.find_all(v -> v != "bar")
+root.indexes = this.things.find_all(this.goal)
+
+# In:  {"goal":"bar","things":["foo", "bar", "baz", "bar", "buz"]}
+# Out: {"indexes":[1,3]}
+```
+
+### `find_all_by`
+
+:::caution BETA
+This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
+:::
+Returns an array containing the indexes of all occurrences of an array where the provided query resolves to a boolean `true`. An empty array is returned if there are no matches. Numerical comparisons are made irrespective of the representation type (float versus integer).
+
+#### Parameters
+
+**`query`** &lt;query expression&gt; A query to execute for each element.  
+
+#### Examples
+
+
+```coffee
+root.index = this.find_all_by(v -> v != "bar")
 
 # In:  ["foo", "bar", "baz"]
 # Out: {"index":[0,2]}
 ```
 
-```coffee
-root.index = this.find_all(v -> v != "foo")
+### `find_by`
 
-# In:  ["foo"]
-# Out: {"index":[]}
+:::caution BETA
+This method is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with it is found.
+:::
+Returns the index of the first occurrence of an array where the provided query resolves to a boolean `true`. `-1` is returned if there are no matches.
+
+#### Parameters
+
+**`query`** &lt;query expression&gt; A query to execute for each element.  
+
+#### Examples
+
+
+```coffee
+root.index = this.find_by(v -> v != "bar")
+
+# In:  ["foo", "bar", "baz"]
+# Out: {"index":0}
 ```
 
 ### `flatten`
@@ -1927,7 +2209,7 @@ root = this.json_schema("""{
 In order to load a schema from a file use the `file` function.
 
 ```coffee
-root = this.json_schema(file(var("BENTHOS_TEST_BLOBLANG_SCHEMA_FILE")))
+root = this.json_schema(file(env("BENTHOS_TEST_BLOBLANG_SCHEMA_FILE")))
 ```
 
 ### `key_values`
@@ -2053,6 +2335,60 @@ root = this.foo.merge(this.bar)
 
 # In:  {"foo":{"first_name":"fooer","likes":"bars"},"bar":{"second_name":"barer","likes":"foos"}}
 # Out: {"first_name":"fooer","likes":["bars","foos"],"second_name":"barer"}
+```
+
+### `sign_jwt_hs256`
+
+Hash and sign an object representing JSON Web Token (JWT) claims using HS256.
+
+#### Parameters
+
+**`signing_secret`** &lt;string&gt; The HMAC secret to use for signing the token.  
+
+#### Examples
+
+
+```coffee
+root.signed = this.claims.sign_jwt_hs256("dont-tell-anyone")
+
+# In:  {"claims":{"sub":"user123"}}
+# Out: {"signed":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.hUl-nngPMY_3h9vveWJUPsCcO5PeL6k9hWLnMYeFbFQ"}
+```
+
+### `sign_jwt_hs384`
+
+Hash and sign an object representing JSON Web Token (JWT) claims using HS384.
+
+#### Parameters
+
+**`signing_secret`** &lt;string&gt; The HMAC secret to use for signing the token.  
+
+#### Examples
+
+
+```coffee
+root.signed = this.claims.sign_jwt_hs384("dont-tell-anyone")
+
+# In:  {"claims":{"sub":"user123"}}
+# Out: {"signed":"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.zGYLr83aToon1efUNq-hw7XgT20lPvZb8sYei8x6S6mpHwb433SJdXJXx0Oio8AZ"}
+```
+
+### `sign_jwt_hs512`
+
+Hash and sign an object representing JSON Web Token (JWT) claims using HS512.
+
+#### Parameters
+
+**`signing_secret`** &lt;string&gt; The HMAC secret to use for signing the token.  
+
+#### Examples
+
+
+```coffee
+root.signed = this.claims.sign_jwt_hs512("dont-tell-anyone")
+
+# In:  {"claims":{"sub":"user123"}}
+# Out: {"signed":"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIn0.zBNR9o_6EDwXXKkpKLNJhG26j8Dc-mV-YahBwmEdCrmiWt5les8I9rgmNlWIowpq6Yxs4kLNAdFhqoRz3NXT3w"}
 ```
 
 ### `slice`
@@ -2613,11 +2949,40 @@ root.doc = this.doc.parse_yaml()
 
 ## Encoding and Encryption
 
+### `compress`
+
+Compresses a string or byte array value according to a specified algorithm.
+
+#### Parameters
+
+**`algorithm`** &lt;string&gt; One of `flate`, `gzip`, `lz4`, `snappy`, `zlib`, `zstd`.  
+**`level`** &lt;integer, default `-1`&gt; The level of compression to use. May not be applicable to all algorithms.  
+
+#### Examples
+
+
+```coffee
+let long_content = range(0, 1000).map_each(content()).join(" ")
+root.a_len = $long_content.length()
+root.b_len = $long_content.compress("gzip").length()
+
+
+# In:  hello world this is some content
+# Out: {"a_len":32999,"b_len":161}
+```
+
+```coffee
+root.compressed = content().compress("lz4").encode("base64")
+
+# In:  hello world I love space
+# Out: {"compressed":"BCJNGGRwuRgAAIBoZWxsbyB3b3JsZCBJIGxvdmUgc3BhY2UAAAAAGoETLg=="}
+```
+
 ### `decode`
 
 Decodes an encoded string target according to a chosen scheme and returns the result as a byte array. When mapping the result to a JSON field the value should be cast to a string using the method [`string`][methods.string], or encoded using the method [`encode`][methods.encode], otherwise it will be base64 encoded by default.
 
-Available schemes are: `base64`, `base64url`, `hex`, `ascii85`.
+Available schemes are: `base64`, `base64url` [(RFC 4648 with padding characters)](https://rfc-editor.org/rfc/rfc4648.html), `base64rawurl` [(RFC 4648 without padding characters)](https://rfc-editor.org/rfc/rfc4648.html), `hex`, `ascii85`.
 
 #### Parameters
 
@@ -2638,6 +3003,33 @@ root = this.encoded.decode("ascii85")
 
 # In:  {"encoded":"FD,B0+DGm>FDl80Ci\"A>F`)8BEckl6F`M&(+Cno&@/"}
 # Out: this is totally unstructured data
+```
+
+### `decompress`
+
+Decompresses a string or byte array value according to a specified algorithm. The result of decompression 
+
+#### Parameters
+
+**`algorithm`** &lt;string&gt; One of `gzip`, `zlib`, `bzip2`, `flate`, `snappy`, `lz4`, `zstd`.  
+
+#### Examples
+
+
+```coffee
+root = this.compressed.decode("base64").decompress("lz4")
+
+# In:  {"compressed":"BCJNGGRwuRgAAIBoZWxsbyB3b3JsZCBJIGxvdmUgc3BhY2UAAAAAGoETLg=="}
+# Out: hello world I love space
+```
+
+Use the `.string()` method in order to coerce the result into a string, this makes it possible to place the data within a JSON document without automatic base64 encoding.
+
+```coffee
+root.result = this.compressed.decode("base64").decompress("lz4").string()
+
+# In:  {"compressed":"BCJNGGRwuRgAAIBoZWxsbyB3b3JsZCBJIGxvdmUgc3BhY2UAAAAAGoETLg=="}
+# Out: {"result":"hello world I love space"}
 ```
 
 ### `decrypt_aes`
@@ -2664,7 +3056,7 @@ root.decrypted = this.value.decode("hex").decrypt_aes("ctr", $key, $vector).stri
 
 ### `encode`
 
-Encodes a string or byte array target according to a chosen scheme and returns a string result. Available schemes are: `base64`, `base64url`, `hex`, `ascii85`.
+Encodes a string or byte array target according to a chosen scheme and returns a string result. Available schemes are: `base64`, `base64url` [(RFC 4648 with padding characters)](https://rfc-editor.org/rfc/rfc4648.html), `base64rawurl` [(RFC 4648 without padding characters)](https://rfc-editor.org/rfc/rfc4648.html), `hex`, `ascii85`.
 
 #### Parameters
 
@@ -2859,6 +3251,14 @@ Attempts to format a timestamp value as a string according to a specified strfti
 ### `format_timestamp_unix`
 
 Attempts to format a timestamp value as a unix timestamp. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.
+
+### `format_timestamp_unix_micro`
+
+Attempts to format a timestamp value as a unix timestamp with microsecond precision. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.
+
+### `format_timestamp_unix_milli`
+
+Attempts to format a timestamp value as a unix timestamp with millisecond precision. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.
 
 ### `format_timestamp_unix_nano`
 

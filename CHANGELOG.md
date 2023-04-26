@@ -5,19 +5,111 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 4.14.0 - 2023-04-25
+
+### Added
+
+- The `-e/--env-file` cli flag can now be specified multiple times.
+- New `studio pull` cli subcommand for running [Benthos Studio](https://studio.benthos.dev) session deployments.
+- Metadata field `kafka_tombstone_message` added to the `kafka` and `kafka_franz` inputs.
+- Method `SetEnvVarLookupFunc` added to the stream builder API.
+- The `discord` input and output now use the official chat client API and no longer rely on poll-based HTTP requests, this should result in more efficient and less erroneous behaviour.
+- New bloblang timestamp methods `ts_add_iso8601` and `ts_sub_iso8601`.
+- All SQL components now support the `trino` driver.
+- New input codec `csv-safe`.
+- Added `base64rawurl` scheme to both the `encode` and `decode` Bloblang methods.
+- New `find_by` and `find_all_by` Bloblang methods.
+- New `skipbom` input codec.
+- New `javascript` processor.
+
+### Fixed
+
+- The `find_all` bloblang method no longer produces results that are of an `unknown` type.
+- The `find_all` and `find` Bloblang methods no longer fail when the value argument is a field reference.
+- Endpoints specified by HTTP server components using both the general `http` server block or their own custom server addresses should now be treated as path prefixes. This corrects a behavioural change that was introduced when both respective server options were updated to support path parameters.
+- Prevented a panic caused when using the `encrypt_aes` and `decrypt_aes` Bloblang methods with a mismatched key/iv lengths.
+- The `snowpipe` field of the `snowflake_put` output can now be omitted from the config without raising an error.
+- Batch-aware processors such as `mapping` and `mutation` should now report correct error metrics.
+- Running `benthos blobl server` should no longer panic when a mapping with variable read/writes is executed in parallel.
+- Speculative fix for the `cloudwatch` metrics exporter rejecting metrics due to `minimum field size of 1, PutMetricDataInput.MetricData[0].Dimensions[0].Value`.
+- The `snowflake_put` output now prevents silent failures under certain conditions. Details [here](https://github.com/snowflakedb/gosnowflake/issues/701).
+- Reduced the amount of pre-compilation of Bloblang based linting rules for documentation fields, this should dramatically improve the start up time of Benthos (~1s down to ~200ms).
+- Environment variable interpolations with an empty fallback (`${FOO:}`) are now valid.
+- Fixed an issue where the `mongodb` output wasn't using bulk send requests according to batching policies.
+- The `amqp_1` input now falls back to accessing `Message.Value` when the data is empty.
+
+### Changed
+
+- When a config contains environment variable interpolations without a default value (i.e. `${FOO}`), if that environment variable is not defined a linting error will be emitted. Shutting down due to linting errors can be disabled with the `--chilled` cli flag, and variables can be specified with an empty default value (`${FOO:}`) in order to make the previous behaviour explicit and prevent the new linting error.
+- The `find` and `find_all` Bloblang methods no longer support query arguments as they were incompatible with supporting value arguments. For query based arguments use the new `find_by` and `find_all_by` methods.
+
+## 4.13.0 - 2023-03-15
+
+### Added
+
+- Fix vulnerability [GO-2023-1571](https://pkg.go.dev/vuln/GO-2023-1571)
+- New `nats_kv` processor, input and output.
+- Field `partition` added to the `kafka_franz` output, allowing for manual partitioning.
+
+### Fixed
+
+- The `broker` output with the pattern `fan_out_sequential` will no longer abandon in-flight requests that are error blocked until the full shutdown timeout has occurred.
+- Fixed a regression bug in the `sequence` input where the returned messages have type `unknown`. This issue was introduced in v4.10.0 (cefa288).
+- The `broker` input no longer reports itself as unavailable when a child input has intentionally closed.
+- Config unit tests that check for structured data should no longer fail in all cases.
+- The `http_server` input with a custom address now supports path variables.
+
+## 4.12.1 - 2023-02-23
+
+### Fixed
+
+- Fixed a regression bug in the `nats` components where panics occur during a flood of messages. This issue was introduced in v4.12.0 (45f785a).
+
+## 4.12.0 - 2023-02-20
+
 ### Added
 
 - Format `csv:x` added to the `unarchive` processor.
 - Field `max_buffer` added to the `aws_s3` input.
 - Field `open_message_type` added to the `websocket` input.
 - The experimental `--watcher` cli flag now takes into account file deletions and new files that match wildcard patterns.
+- Field `dump_request_log_level` added to HTTP components.
+- New `couchbase` cache implementation.
+- New `compress` and `decompress` Bloblang methods.
+- Field `endpoint` added to the `gcp_pubsub` input and output.
+- Fields `file_name`, `file_extension` and `request_id` added to the `snowflake_put` output.
+- Add interpolation support to the `path` field of the `snowflake_put` output.
+- Add ZSTD compression support to the `compression` field of the `snowflake_put` output.
+- New Bloblang method `concat`.
+- New `redis` ratelimit.
+- The `socket_server` input now supports `tls` as a network type.
+- New bloblang function `timestamp_unix_milli`.
+- New bloblang method `ts_unix_milli`.
+- JWT based HTTP authentication now supports `EdDSA`.
+- New `flow_control` fields added to the `gcp_pubsub` output.
+- Added bloblang methods `sign_jwt_hs256`, `sign_jwt_hs384` and `sign_jwt_hs512`
+- New bloblang methods `parse_jwt_hs256`, `parse_jwt_hs384`, `parse_jwt_hs512`.
+- The `open_telemetry_collector` tracer now automatically sets the `service.name` and `service.version` tags if they are not configured by the user.
+- New bloblang string methods `trim_prefix` and `trim_suffix`.
 
 ### Fixed
 
+- Fixed an issue where messages caught in a retry loop from inputs that do not support nacks (`generate`, `kafka`, `file`, etc) could be retried in their post-mutation form from the `switch` output rather than the original copy of the message.
 - The `sqlite` buffer should no longer print `Failed to ack buffer message` logs during graceful termination.
 - The default value of the `conn_max_idle` field has been changed from 0 to 2 for all `sql_*` components in accordance
 to the [`database/sql` docs](https://pkg.go.dev/database/sql#DB.SetMaxIdleConns).
 - The `parse_csv` bloblang method with `parse_header_row` set to `false` no longer produces rows that are of an `unknown` type.
+- Fixed a bug where the `oracle` driver for the `sql_*` components was returning timestamps which were getting marshalled into an empty JSON object instead of a string.
+- The `aws_sqs` input no longer backs off on subsequent empty requests when long polling is enabled.
+- It's now possible to mock resources within the main test target file in config unit tests.
+- Unit test linting no longer incorrectly expects the `json_contains` predicate to contain a string value only.
+- Config component initialisation errors should no longer show nested path annotations.
+- Prevented panics from the `jq` processor when querying invalid types.
+- The `jaeger` tracer no longer emits the `service.version` tag automatically if the user sets the `service.name` tag explicitly.
+- The `int64()`, `int32()`, `uint64()` and `uint32()` bloblang methods can now infer the number base as documented [here](https://pkg.go.dev/strconv#ParseInt).
+- The `mapping` and `mutation` processors should provide metrics and tracing events again.
+- Fixed a data race in the `redis_streams` input.
+- Upgraded the Redis components to `github.com/redis/go-redis/v9`.
 
 ## 4.11.0 - 2022-12-21
 

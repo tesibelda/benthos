@@ -113,6 +113,16 @@ func TestTimestampMethods(t *testing.T) {
 			output:  int64(1257894000),
 		},
 		{
+			name:    "check ts_unix_milli",
+			mapping: `root = "2009-11-10T23:00:00Z".ts_unix_milli()`,
+			output:  int64(1257894000000),
+		},
+		{
+			name:    "check ts_unix_micro",
+			mapping: `root = "2009-11-10T23:00:00Z".ts_unix_micro()`,
+			output:  int64(1257894000000000),
+		},
+		{
 			name:    "check ts_unix_nano",
 			mapping: `root = "2009-11-10T23:00:00Z".ts_unix_nano()`,
 			output:  int64(1257894000000000000),
@@ -156,6 +166,16 @@ func TestTimestampMethods(t *testing.T) {
 			name:               "check parse duration ISO-8601 with bogus format",
 			mapping:            `root = "gibberish".parse_duration_iso8601()`,
 			parseErrorContains: "gibberish: expected 'P' period mark at the start",
+		},
+		{
+			name:    "check ts_add_iso8601",
+			mapping: `root = 1677097265.ts_add_iso8601("P1Y").ts_unix()`,
+			output:  int64(1708633265),
+		},
+		{
+			name:    "check ts_sub_iso8601",
+			mapping: `root = 1677097265.ts_sub_iso8601("P1Y").ts_unix()`,
+			output:  int64(1645561265),
 		},
 	}
 

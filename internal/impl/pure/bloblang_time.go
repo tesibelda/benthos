@@ -83,6 +83,52 @@ func init() {
 		panic(err)
 	}
 
+	tsAddISOSpec := bloblang.NewPluginSpec().
+		Category(query.MethodCategoryTime).
+		Beta().
+		Static().
+		Description("Parse parameter string as ISO 8601 period and add it to value with high precision for units larger than an hour.").
+		Param(bloblang.NewStringParam("duration").Description(`Duration in ISO 8601 format`))
+
+	tsSubISOSpec := bloblang.NewPluginSpec().
+		Category(query.MethodCategoryTime).
+		Beta().
+		Static().
+		Description("Parse parameter string as ISO 8601 period and subtract it from value with high precision for units larger than an hour.").
+		Param(bloblang.NewStringParam("duration").Description(`Duration in ISO 8601 format`))
+
+	tsModifyISOCtor := func(callback func(d period.Period, t time.Time) time.Time) func(args *bloblang.ParsedParams) (bloblang.Method, error) {
+		return func(args *bloblang.ParsedParams) (bloblang.Method, error) {
+			s, err := args.GetString("duration")
+			if err != nil {
+				return nil, err
+			}
+			dur, err := period.Parse(s)
+			if err != nil {
+				return nil, err
+			}
+			return bloblang.TimestampMethod(func(t time.Time) (any, error) {
+				return callback(dur, t), nil
+			}), nil
+		}
+	}
+
+	if err := bloblang.RegisterMethodV2("ts_add_iso8601", tsAddISOSpec,
+		tsModifyISOCtor(func(d period.Period, t time.Time) time.Time {
+			r, _ := d.AddTo(t)
+			return r
+		})); err != nil {
+		panic(err)
+	}
+
+	if err := bloblang.RegisterMethodV2("ts_sub_iso8601", tsSubISOSpec,
+		tsModifyISOCtor(func(d period.Period, t time.Time) time.Time {
+			r, _ := d.Negate().AddTo(t)
+			return r
+		})); err != nil {
+		panic(err)
+	}
+
 	//--------------------------------------------------------------------------
 
 	parseDurSpec := bloblang.NewPluginSpec().
@@ -448,6 +494,68 @@ The output format is defined by showing how the reference time, defined to be Mo
 	}
 
 	if err := bloblang.RegisterMethodV2("format_timestamp_unix", formatTSUnixSpecDep, formatTSUnixCtor); err != nil {
+		panic(err)
+	}
+
+	formatTSUnixMilliSpec := bloblang.NewPluginSpec().
+		Category(query.MethodCategoryTime).
+		Beta().
+		Static().
+		Description("Attempts to format a timestamp value as a unix timestamp with millisecond precision. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.")
+
+	formatTSUnixMilliSpecDep := asDeprecated(formatTSUnixMilliSpec)
+
+	formatTSUnixMilliSpec = formatTSUnixMilliSpec.
+		Example("",
+			`root.created_at_unix = this.created_at.ts_unix_milli()`,
+			[2]string{
+				`{"created_at":"2009-11-10T23:00:00Z"}`,
+				`{"created_at_unix":1257894000000}`,
+			},
+		)
+
+	formatTSUnixMilliCtor := func(args *bloblang.ParsedParams) (bloblang.Method, error) {
+		return bloblang.TimestampMethod(func(target time.Time) (any, error) {
+			return target.UnixMilli(), nil
+		}), nil
+	}
+
+	if err := bloblang.RegisterMethodV2("ts_unix_milli", formatTSUnixMilliSpec, formatTSUnixMilliCtor); err != nil {
+		panic(err)
+	}
+
+	if err := bloblang.RegisterMethodV2("format_timestamp_unix_milli", formatTSUnixMilliSpecDep, formatTSUnixMilliCtor); err != nil {
+		panic(err)
+	}
+
+	formatTSUnixMicroSpec := bloblang.NewPluginSpec().
+		Category(query.MethodCategoryTime).
+		Beta().
+		Static().
+		Description("Attempts to format a timestamp value as a unix timestamp with microsecond precision. Timestamp values can either be a numerical unix time in seconds (with up to nanosecond precision via decimals), or a string in RFC 3339 format. The [`ts_parse`](#ts_parse) method can be used in order to parse different timestamp formats.")
+
+	formatTSUnixMicroSpecDep := asDeprecated(formatTSUnixMicroSpec)
+
+	formatTSUnixMicroSpec = formatTSUnixMicroSpec.
+		Example("",
+			`root.created_at_unix = this.created_at.ts_unix_micro()`,
+			[2]string{
+				`{"created_at":"2009-11-10T23:00:00Z"}`,
+				`{"created_at_unix":1257894000000000}`,
+			},
+		)
+
+	formatTSUnixMicroCtor := func(args *bloblang.ParsedParams) (bloblang.Method, error) {
+		return bloblang.TimestampMethod(func(target time.Time) (any, error) {
+			return target.UnixMicro(), nil
+		}), nil
+	}
+
+	if err := bloblang.RegisterMethodV2("ts_unix_micro", formatTSUnixMicroSpec, formatTSUnixMicroCtor); err != nil {
+		panic(err)
+	}
+
+	if err := bloblang.RegisterMethodV2("format_timestamp_unix_micro", formatTSUnixMicroSpecDep, formatTSUnixMicroCtor); err != nil {
 		panic(err)
 	}
 

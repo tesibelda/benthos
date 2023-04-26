@@ -211,10 +211,11 @@ func TestNotBatchedBreakOutMessagesErrors(t *testing.T) {
 	tChan := make(chan message.Transaction)
 	require.NoError(t, nbOut.Consume(tChan))
 
+	sourceMessage := msg("foo0", "foo1", "foo2", "foo3", "foo4")
+	sortGroup, sourceMessage := message.NewSortGroup(sourceMessage)
+
 	select {
-	case tChan <- message.NewTransaction(msg(
-		"foo0", "foo1", "foo2", "foo3", "foo4",
-	), resChan):
+	case tChan <- message.NewTransaction(sourceMessage, resChan):
 	case <-time.After(time.Second):
 		t.Fatal("timed out")
 	}
@@ -223,11 +224,11 @@ func TestNotBatchedBreakOutMessagesErrors(t *testing.T) {
 		err := res
 		require.Error(t, err)
 
-		walkable, ok := err.(*batch.Error)
-		require.True(t, ok)
+		var walkable *batch.Error
+		require.ErrorAs(t, err, &walkable, "expected error to be walkable batch error")
 
 		errs := map[int]string{}
-		walkable.WalkParts(func(i int, _ *message.Part, err error) bool {
+		walkable.WalkParts(sortGroup, sourceMessage, func(i int, _ *message.Part, err error) bool {
 			if err != nil {
 				errs[i] = err.Error()
 			}
@@ -270,10 +271,11 @@ func TestNotBatchedBreakOutMessagesErrorsAsync(t *testing.T) {
 	tChan := make(chan message.Transaction)
 	require.NoError(t, nbOut.Consume(tChan))
 
+	sourceMessage := msg("foo0", "foo1", "foo2", "foo3", "foo4")
+	sortGroup, sourceMessage := message.NewSortGroup(sourceMessage)
+
 	select {
-	case tChan <- message.NewTransaction(msg(
-		"foo0", "foo1", "foo2", "foo3", "foo4",
-	), resChan):
+	case tChan <- message.NewTransaction(sourceMessage, resChan):
 	case <-time.After(time.Second):
 		t.Fatal("timed out")
 	}
@@ -282,11 +284,11 @@ func TestNotBatchedBreakOutMessagesErrorsAsync(t *testing.T) {
 		err := res
 		require.Error(t, err)
 
-		walkable, ok := err.(*batch.Error)
-		require.True(t, ok)
+		var walkable *batch.Error
+		require.ErrorAs(t, err, &walkable, "expected error to be walkable batch error")
 
 		errs := map[int]string{}
-		walkable.WalkParts(func(i int, _ *message.Part, err error) bool {
+		walkable.WalkParts(sortGroup, sourceMessage, func(i int, _ *message.Part, err error) bool {
 			if err != nil {
 				errs[i] = err.Error()
 			}

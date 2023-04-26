@@ -192,6 +192,7 @@ func TestSwitchBatchNoRetries(t *testing.T) {
 		[]byte(`{"content":"hello world","id":3}`),
 		[]byte(`{"content":"hello world","id":4}`),
 	})
+	sortGroup, msg := message.NewSortGroup(msg)
 
 	select {
 	case readChan <- message.NewTransaction(msg, resChan):
@@ -209,13 +210,13 @@ func TestSwitchBatchNoRetries(t *testing.T) {
 	err = res
 	require.Error(t, err)
 
-	bOut, ok := err.(*batch.Error)
-	require.True(t, ok, "should be batch error, got: %v", err)
+	var bOut *batch.Error
+	require.ErrorAsf(t, err, &bOut, "should be batch error, got: %v", err)
 
 	assert.Equal(t, 2, bOut.IndexedErrors())
 
 	errContents := []string{}
-	bOut.WalkParts(func(i int, p *message.Part, e error) bool {
+	bOut.WalkParts(sortGroup, msg, func(i int, p *message.Part, e error) bool {
 		if e != nil {
 			errContents = append(errContents, string(p.AsBytes()))
 			assert.EqualError(t, e, "meow")
@@ -259,6 +260,7 @@ func TestSwitchBatchNoRetriesBatchErr(t *testing.T) {
 		[]byte("hello world 3"),
 		[]byte("hello world 4"),
 	})
+	sortGroup, msg := message.NewSortGroup(msg)
 
 	select {
 	case readChan <- message.NewTransaction(msg, resChan):
@@ -293,13 +295,13 @@ func TestSwitchBatchNoRetriesBatchErr(t *testing.T) {
 		err := res
 		require.Error(t, err)
 
-		bOut, ok := err.(*batch.Error)
-		require.True(t, ok, "should be batch error but got %T", err)
+		var bOut *batch.Error
+		require.ErrorAsf(t, err, &bOut, "should be batch error but got %T", err)
 
 		assert.Equal(t, 2, bOut.IndexedErrors())
 
 		errContents := []string{}
-		bOut.WalkParts(func(i int, p *message.Part, e error) bool {
+		bOut.WalkParts(sortGroup, msg, func(i int, p *message.Part, e error) bool {
 			if e != nil {
 				errContents = append(errContents, string(p.AsBytes()))
 				assert.EqualError(t, e, fmt.Sprintf("err %v", i))

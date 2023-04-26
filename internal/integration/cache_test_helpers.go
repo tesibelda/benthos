@@ -33,6 +33,7 @@ type CacheTestConfigVars struct {
 
 	// Generic variables.
 	Var1 string
+	Var2 string
 }
 
 // CachePreTestFn is an optional closure to be called before tests are run, this
@@ -75,6 +76,7 @@ func (e cacheTestEnvironment) RenderConfig() string {
 		"$ID", e.configVars.ID,
 		"$PORT", e.configVars.Port,
 		"$VAR1", e.configVars.Var1,
+		"$VAR2", e.configVars.Var2,
 	).Replace(e.configTemplate)
 }
 
@@ -100,7 +102,7 @@ func CacheTestOptLogging(level string) CacheTestOptFunc {
 		logConf := log.NewConfig()
 		logConf.LogLevel = level
 		var err error
-		env.log, err = log.NewV2(os.Stdout, logConf)
+		env.log, err = log.New(os.Stdout, logConf)
 		if err != nil {
 			panic(err)
 		}
@@ -119,6 +121,14 @@ func CacheTestOptPort(port string) CacheTestOptFunc {
 func CacheTestOptVarOne(v string) CacheTestOptFunc {
 	return func(env *cacheTestEnvironment) {
 		env.configVars.Var1 = v
+	}
+}
+
+// CacheTestOptVarTwo sets an arbitrary variable for the test that can be
+// injected into templated configs.
+func CacheTestOptVarTwo(v string) CacheTestOptFunc {
+	return func(env *cacheTestEnvironment) {
+		env.configVars.Var2 = v
 	}
 }
 
@@ -161,9 +171,6 @@ func (i CacheTestList) Run(t *testing.T, configTemplate string, opts ...CacheTes
 		env.ctx, done = context.WithTimeout(env.ctx, env.timeout)
 		t.Cleanup(done)
 
-		if env.preTest != nil {
-			env.preTest(t, env.ctx, env.configVars.ID, &env.configVars)
-		}
 		test.fn(t, &env)
 	}
 }
@@ -174,6 +181,10 @@ func namedCacheTest(name string, test cacheTestDefinitionFn) CacheTestDefinition
 	return CacheTestDefinition{
 		fn: func(t *testing.T, env *cacheTestEnvironment) {
 			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				if env.preTest != nil {
+					env.preTest(t, env.ctx, env.configVars.ID, &env.configVars)
+				}
 				test(t, env)
 			})
 		},

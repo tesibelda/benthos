@@ -28,10 +28,11 @@ func TestIntegrationWriter(t *testing.T) {
 	if err != nil {
 		t.Skipf("Could not connect to docker: %s", err)
 	}
-	pool.MaxWait = time.Second * 60
+	pool.MaxWait = time.Minute * 3
 
 	resource, err := pool.Run("elasticsearch", "7.17.0", []string{
 		"discovery.type=single-node",
+		"ES_JAVA_OPTS=-Xms512m -Xmx512m", // By default ES immediately gobbles half the available RAM, what a psychopath.
 	})
 	if err != nil {
 		t.Fatalf("Could not start resource: %s", err)
