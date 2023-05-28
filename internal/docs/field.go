@@ -613,13 +613,13 @@ func (f FieldSpecs) Add(specs ...FieldSpec) FieldSpecs {
 
 // FieldFilter defines a filter closure that returns a boolean for a component
 // field indicating whether the field should be kept within a generated config.
-type FieldFilter func(spec FieldSpec) bool
+type FieldFilter func(spec FieldSpec, v any) bool
 
-func (f FieldFilter) shouldDrop(spec FieldSpec) bool {
+func (f FieldFilter) shouldDrop(spec FieldSpec, v any) bool {
 	if f == nil {
 		return false
 	}
-	return !f(spec)
+	return !f(spec, v)
 }
 
 // ShouldDropDeprecated returns a field filter that removes all deprecated
@@ -628,7 +628,7 @@ func ShouldDropDeprecated(b bool) FieldFilter {
 	if !b {
 		return nil
 	}
-	return func(spec FieldSpec) bool {
+	return func(spec FieldSpec, _ any) bool {
 		return !spec.IsDeprecated
 	}
 }
@@ -688,6 +688,10 @@ const (
 
 	// LintFailedRead means a configuration could not be read.
 	LintFailedRead LintType = iota
+
+	// LintMissingEnvVar means a configuration contained an environment variable
+	// interpolation without a default and the variable was undefined.
+	LintMissingEnvVar LintType = iota
 
 	// LintInvalidOption means the field value was not one of the explicit list
 	// of options.

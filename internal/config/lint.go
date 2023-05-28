@@ -19,14 +19,25 @@ import (
 type LintOptions struct {
 	RejectDeprecated bool
 	RequireLabels    bool
+	SkipEnvVarCheck  bool
 }
 
 // ReadFileLinted will attempt to read a configuration file path into a
 // structure. Returns an array of lint messages or an error.
 func ReadFileLinted(fs ifs.FS, path string, opts LintOptions, config *Type) ([]docs.Lint, error) {
-	configBytes, lints, _, err := ReadFileEnvSwap(fs, path)
+	configBytes, lints, _, err := ReadFileEnvSwap(fs, path, os.LookupEnv)
 	if err != nil {
 		return nil, err
+	}
+
+	if opts.SkipEnvVarCheck {
+		var newLints []docs.Lint
+		for _, l := range lints {
+			if l.Type != docs.LintMissingEnvVar {
+				newLints = append(newLints, l)
+			}
+		}
+		lints = newLints
 	}
 
 	if err := yaml.Unmarshal(configBytes, config); err != nil {
@@ -66,7 +77,7 @@ func LintBytes(opts LintOptions, rawBytes []byte) ([]docs.Lint, error) {
 // encoding.
 //
 // An modTime timestamp is returned if the modtime of the file is available.
-func ReadFileEnvSwap(store ifs.FS, path string) (configBytes []byte, lints []docs.Lint, modTime time.Time, err error) {
+func ReadFileEnvSwap(store ifs.FS, path string, lookupEnvFn func(name string) (string, bool)) (configBytes []byte, lints []docs.Lint, modTime time.Time, err error) {
 	var configFile fs.File
 	if configFile, err = store.Open(path); err != nil {
 		return
@@ -87,11 +98,11 @@ func ReadFileEnvSwap(store ifs.FS, path string) (configBytes []byte, lints []doc
 		))
 	}
 
-	if configBytes, err = ReplaceEnvVariables(configBytes, os.LookupEnv); err != nil {
+	if configBytes, err = ReplaceEnvVariables(configBytes, lookupEnvFn); err != nil {
 		var errEnvMissing *ErrMissingEnvVars
 		if errors.As(err, &errEnvMissing) {
 			configBytes = errEnvMissing.BestAttempt
-			lints = append(lints, docs.NewLintError(1, docs.LintFailedRead, err.Error()))
+			lints = append(lints, docs.NewLintError(1, docs.LintMissingEnvVar, err.Error()))
 			err = nil
 		} else {
 			return
