@@ -50,6 +50,8 @@ input:
       root_cas: ""
       root_cas_file: ""
       client_certs: []
+    connection:
+      max_retries: 0
     oauth:
       enabled: false
       consumer_key: ""
@@ -248,6 +250,20 @@ password: foo
 password: ${KEY_PASSWORD}
 ```
 
+### `connection`
+
+Customise how websocket connection attempts are made.
+
+
+Type: `object`  
+
+### `connection.max_retries`
+
+An optional limit to the number of consecutive retry attempts that will be made before abandoning the connection altogether and gracefully terminating the input. When all inputs terminate in this way the service (or stream) will shut down. If set to zero connections will never be reattempted upon a failure. If set below zero this field is ignored (effectively unset).
+
+
+Type: `int`  
+
 ### `oauth`
 
 Allows you to specify open authentication via OAuth version 1.
@@ -372,6 +388,7 @@ A value used to identify the claims that issued the JWT.
 
 
 Type: `object`  
+Default: `{}`  
 
 ### `jwt.headers`
 
@@ -379,5 +396,6 @@ Add optional key/value headers to the JWT.
 
 
 Type: `object`  
+Default: `{}`  
 
 
