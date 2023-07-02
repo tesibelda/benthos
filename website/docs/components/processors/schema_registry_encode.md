@@ -33,8 +33,8 @@ Introduced in version 3.58.0.
 # Common config fields, showing default values
 label: ""
 schema_registry_encode:
-  url: ""
-  subject: ""
+  url: "" # No default (required)
+  subject: foo # No default (required)
   refresh_period: 10m
 ```
 
@@ -45,8 +45,8 @@ schema_registry_encode:
 # All config fields, showing default values
 label: ""
 schema_registry_encode:
-  url: ""
-  subject: ""
+  url: "" # No default (required)
+  subject: foo # No default (required)
   refresh_period: 10m
   avro_raw_json: false
   oauth:
@@ -353,6 +353,7 @@ A list of client certificates to use. For each certificate either the fields `ce
 
 
 Type: `array`  
+Default: `[]`  
 
 ```yml
 # Examples

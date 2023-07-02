@@ -29,8 +29,8 @@ Reads messages from an AMQP (1.0) server.
 input:
   label: ""
   amqp_1:
-    url: ""
-    source_address: ""
+    url: amqp://localhost:5672/ # No default (required)
+    source_address: /foo # No default (required)
 ```
 
 </TabItem>
@@ -41,8 +41,8 @@ input:
 input:
   label: ""
   amqp_1:
-    url: ""
-    source_address: ""
+    url: amqp://localhost:5672/ # No default (required)
+    source_address: /foo # No default (required)
     azure_renew_lock: false
     tls:
       enabled: false
@@ -188,6 +188,7 @@ A list of client certificates to use. For each certificate either the fields `ce
 
 
 Type: `array`  
+Default: `[]`  
 
 ```yml
 # Examples

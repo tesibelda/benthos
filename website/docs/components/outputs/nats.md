@@ -29,8 +29,8 @@ Publish to an NATS subject.
 output:
   label: ""
   nats:
-    urls: []
-    subject: ""
+    urls: [] # No default (required)
+    subject: foo.bar.baz # No default (required)
     headers: {}
     max_in_flight: 64
 ```
@@ -43,8 +43,8 @@ output:
 output:
   label: ""
   nats:
-    urls: []
-    subject: ""
+    urls: [] # No default (required)
+    subject: foo.bar.baz # No default (required)
     headers: {}
     max_in_flight: 64
     tls:
@@ -55,10 +55,10 @@ output:
       root_cas_file: ""
       client_certs: []
     auth:
-      nkey_file: ""
-      user_credentials_file: ""
-      user_jwt: ""
-      user_nkey_seed: ""
+      nkey_file: ./seed.nk # No default (optional)
+      user_credentials_file: ./user.creds # No default (optional)
+      user_jwt: "" # No default (optional)
+      user_nkey_seed: "" # No default (optional)
 ```
 
 </TabItem>
@@ -66,6 +66,14 @@ output:
 
 This output will interpolate functions within the subject field, you can find a list of functions [here](/docs/configuration/interpolation#bloblang-queries).
 
+### Connection Name
+
+When monitoring and managing a production NATS system, it is often useful to
+know which connection a message was send/received from. This can be achieved by
+setting the connection name option when creating a NATS connection.
+
+Benthos will automatically set the connection name based off the label of the given
+NATS component, so that monitoring tools between NATS and benthos can stay in sync.
 ### Authentication
 
 There are several components within Benthos which utilise NATS services. You will find that each of these components
@@ -226,6 +234,7 @@ A list of client certificates to use. For each certificate either the fields `ce
 
 
 Type: `array`  
+Default: `[]`  
 
 ```yml
 # Examples

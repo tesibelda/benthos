@@ -29,8 +29,8 @@ Sends messages to an AMQP (0.91) exchange. AMQP is a messaging protocol used by 
 output:
   label: ""
   amqp_0_9:
-    urls: []
-    exchange: ""
+    urls: [] # No default (required)
+    exchange: "" # No default (required)
     key: ""
     type: ""
     metadata:
@@ -46,8 +46,8 @@ output:
 output:
   label: ""
   amqp_0_9:
-    urls: []
-    exchange: ""
+    urls: [] # No default (required)
+    exchange: "" # No default (required)
     exchange_declare:
       enabled: false
       type: direct
@@ -329,6 +329,7 @@ A list of client certificates to use. For each certificate either the fields `ce
 
 
 Type: `array`  
+Default: `[]`  
 
 ```yml
 # Examples

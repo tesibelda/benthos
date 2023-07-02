@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 4.18.0 - 2023-07-02
+
+### Added
+
+- Field `logger.level_name` added for customising the name of log levels in the JSON format.
+- Methods `sign_jwt_rs256`, `sign_jwt_rs384` and `sign_jwt_rs512` added to Bloblang.
+
+### Fixed
+
+- HTTP components no longer ignore `proxy_url` settings when OAuth2 is set.
+- The `PATCH` verb for the streams mode REST API no longer fails to patch over newer components implemented with the latest plugin APIs.
+- The `nats_jetstream` input no longer fails for configs that set `bind` to `true` and do not specify both a `stream` and `durable` together.
+- The `mongodb` processor and output no longer ignores the `upsert` field.
+
+### Changed
+
+- The old `parquet` processor (now superseded by `parquet_encode` and `parquet_decode`) has been removed from 32-bit ARM builds due to build incompatibilities.
+- The `snowflake_put` output has been removed from 32-bit ARM builds due to build incompatibilities.
+- Plugin API: The `(*BatchError).WalkMessages` method has been deprecated in favour of `WalkMessagesIndexedBy`.
+
+## 4.17.0 - 2023-06-13
+
+### Added
+
+- The `dynamic` input and output have a new endpoint `/input/{id}/uptime` and `/output/{id}/uptime` respectively for obtaining the uptime of a given input/output.
+- Field `wait_time_seconds` added to the `aws_sqs` input.
+- Field `timeout` added to the `gcp_cloud_storage` output.
+- All NATS components now set the name of each connection to the component label when specified.
+
+### Fixed
+
+- Restore message ordering support to `gcp_pubsub` output. This issue was introduced in 4.16.0 as a result of [#1836](https://github.com/benthosdev/benthos/pull/1836).
+- Specifying structured metadata values (non-strings) in unit test definitions should no longer cause linting errors.
+
+### Changed
+
+- The `nats` input default value of `prefetch_count` has been increased from `32` to a more appropriate `524288`.
+
 ## 4.16.0 - 2023-05-28
 
 ### Added
