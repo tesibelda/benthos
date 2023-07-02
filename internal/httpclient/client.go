@@ -65,6 +65,7 @@ func NewClientFromOldConfig(conf OldConfig, mgr bundle.NewManagement, opts ...Re
 
 	h := Client{
 		reqCreator: reqCreator,
+		client:     &http.Client{},
 
 		backoffOn: map[int]struct{}{},
 		dropOn:    map[int]struct{}{},
@@ -73,9 +74,7 @@ func NewClientFromOldConfig(conf OldConfig, mgr bundle.NewManagement, opts ...Re
 		mgr: mgr,
 		log: mgr.Logger(),
 	}
-
 	h.clientCtx, h.clientCancel = context.WithCancel(context.Background())
-	h.client = conf.OAuth2.Client(h.clientCtx)
 
 	if tout := conf.Timeout; len(tout) > 0 {
 		var err error
@@ -124,6 +123,8 @@ func NewClientFromOldConfig(conf OldConfig, mgr bundle.NewManagement, opts ...Re
 	if err != nil {
 		return nil, fmt.Errorf("failed to config logger for request dump: %v", err)
 	}
+
+	h.client = conf.OAuth2.Client(h.clientCtx, h.client)
 
 	for _, c := range conf.BackoffOn {
 		h.backoffOn[c] = struct{}{}

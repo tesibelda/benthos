@@ -29,8 +29,8 @@ Sends messages to an AMQP (1.0) server.
 output:
   label: ""
   amqp_1:
-    url: ""
-    target_address: ""
+    url: amqp://localhost:5672/ # No default (required)
+    target_address: /foo # No default (required)
     max_in_flight: 64
     metadata:
       exclude_prefixes: []
@@ -44,8 +44,8 @@ output:
 output:
   label: ""
   amqp_1:
-    url: ""
-    target_address: ""
+    url: amqp://localhost:5672/ # No default (required)
+    target_address: /foo # No default (required)
     max_in_flight: 64
     tls:
       enabled: false
@@ -54,7 +54,7 @@ output:
       root_cas: ""
       root_cas_file: ""
       client_certs: []
-    application_properties_map: ""
+    application_properties_map: "" # No default (optional)
     sasl:
       mechanism: none
       user: ""
@@ -188,6 +188,7 @@ A list of client certificates to use. For each certificate either the fields `ce
 
 
 Type: `array`  
+Default: `[]`  
 
 ```yml
 # Examples
