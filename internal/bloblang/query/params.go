@@ -7,15 +7,16 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ParamDefinition describes a single parameter for a function or method.
 type ParamDefinition struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	ValueType   ValueType `json:"type"`
-
-	castScalarsToLiteral bool
+	Name             string    `json:"name"`
+	Description      string    `json:"description,omitempty"`
+	ValueType        ValueType `json:"type"`
+	NoDynamic        bool      `json:"no_dynamic"`
+	ScalarsToLiteral bool      `json:"scalars_to_literal"`
 
 	// IsOptional is implicit when there's a DefaultValue. However, there are
 	// times when a parameter is used to change behaviour without having a
@@ -36,6 +37,14 @@ func ParamString(name, description string) ParamDefinition {
 	return ParamDefinition{
 		Name: name, Description: description,
 		ValueType: ValueString,
+	}
+}
+
+// ParamTimestamp creates a new timestamp typed parameter.
+func ParamTimestamp(name, description string) ParamDefinition {
+	return ParamDefinition{
+		Name: name, Description: description,
+		ValueType: ValueTimestamp,
 	}
 }
 
@@ -85,8 +94,8 @@ func ParamObject(name, description string) ParamDefinition {
 func ParamQuery(name, description string, wrapScalars bool) ParamDefinition {
 	return ParamDefinition{
 		Name: name, Description: description,
-		ValueType:            ValueQuery,
-		castScalarsToLiteral: wrapScalars,
+		ValueType:        ValueQuery,
+		ScalarsToLiteral: wrapScalars,
 	}
 }
 
@@ -96,6 +105,14 @@ func ParamAny(name, description string) ParamDefinition {
 		Name: name, Description: description,
 		ValueType: ValueUnknown,
 	}
+}
+
+// NoDynamic disables any form of dynamic assignment for this parameter. This is
+// quite limiting (prevents variables from being used, etc) and so should only
+// be used with caution.
+func (d ParamDefinition) DisableDynamic() ParamDefinition {
+	d.NoDynamic = true
+	return d
 }
 
 // Optional marks the parameter as optional.
@@ -137,6 +154,8 @@ func (d ParamDefinition) parseArgValue(v any) (any, error) {
 		case []byte:
 			return string(t), nil
 		}
+	case ValueTimestamp:
+		return IGetTimestamp(v)
 	case ValueBool:
 		return IGetBool(v)
 	case ValueArray:
@@ -151,7 +170,7 @@ func (d ParamDefinition) parseArgValue(v any) (any, error) {
 		if _, isDyn := v.(Function); isDyn {
 			return v, nil
 		}
-		if d.castScalarsToLiteral {
+		if d.ScalarsToLiteral {
 			return NewLiteralFunction("", v), nil
 		}
 	case ValueUnknown:
@@ -203,7 +222,10 @@ func (p Params) PopulateNameless(args ...any) (*ParsedParams, error) {
 		return nil, err
 	}
 
-	dynArgs := p.gatherDynamicArgs(procParams)
+	dynArgs, err := p.gatherDynamicArgs(procParams)
+	if err != nil {
+		return nil, err
+	}
 	return &ParsedParams{
 		source:  p,
 		dynArgs: dynArgs,
@@ -219,7 +241,10 @@ func (p Params) PopulateNamed(args map[string]any) (*ParsedParams, error) {
 		return nil, err
 	}
 
-	dynArgs := p.gatherDynamicArgs(procParams)
+	dynArgs, err := p.gatherDynamicArgs(procParams)
+	if err != nil {
+		return nil, err
+	}
 	return &ParsedParams{
 		source:  p,
 		dynArgs: dynArgs,
@@ -251,7 +276,7 @@ type dynamicArgIndex struct {
 	fn    Function
 }
 
-func (p Params) gatherDynamicArgs(args []any) (dynArgs []dynamicArgIndex) {
+func (p Params) gatherDynamicArgs(args []any) (dynArgs []dynamicArgIndex, err error) {
 	if p.Variadic {
 		for i, arg := range args {
 			if fn, isFn := arg.(Function); isFn {
@@ -265,6 +290,10 @@ func (p Params) gatherDynamicArgs(args []any) (dynArgs []dynamicArgIndex) {
 			continue
 		}
 		if fn, isFn := args[i].(Function); isFn {
+			if param.NoDynamic {
+				err = fmt.Errorf("param %v must not be dynamic", param.Name)
+				return
+			}
 			dynArgs = append(dynArgs, dynamicArgIndex{index: i, fn: fn})
 		}
 	}
@@ -550,6 +579,36 @@ func (p *ParsedParams) FieldOptionalString(n string) (*string, error) {
 		return nil, NewTypeError(v, ValueString)
 	}
 	return &str, nil
+}
+
+// FieldTimestamp returns a timestamp argument value with a given name.
+func (p *ParsedParams) FieldTimestamp(n string) (time.Time, error) {
+	v, err := p.Field(n)
+	if err != nil {
+		return time.Time{}, err
+	}
+	t, ok := v.(time.Time)
+	if !ok {
+		return time.Time{}, NewTypeError(v, ValueTimestamp)
+	}
+	return t, nil
+}
+
+// FieldOptionalTimestamp returns a timestamp argument value with a given name
+// if it was defined, otherwise nil.
+func (p *ParsedParams) FieldOptionalTimestamp(n string) (*time.Time, error) {
+	v, err := p.Field(n)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, nil
+	}
+	t, ok := v.(time.Time)
+	if !ok {
+		return nil, NewTypeError(v, ValueTimestamp)
+	}
+	return &t, nil
 }
 
 // FieldInt64 returns an integer argument value with a given name.
