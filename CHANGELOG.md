@@ -5,9 +5,21 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 4.24.0 - 2023-11-24
+
+### Added
+
+- Field `idempotent_write` added to the `kafka_franz` output.
+- Field `idle_timeout` added to the `read_until` input.
+- Field `delay_seconds` added to the `aws_sqs` output.
+- Fields `discard_unknown` and `use_proto_names` added to the `protobuf` processors.
+
 ### Fixed
 
 - Bloblang error messages for bad function/method names or parameters should now be improved in mappings that use shorthand for `root = ...`.
+- All redis components now support usernames within the configured URL for authentication.
+- The `protobuf` processor now supports targetting nested types from proto files.
+- The `schema_registry_encode` and `schema_registry_decode` processors should no longer double escape URL unsafe characters within subjects when querying their latest versions.
 
 ## 4.23.0 - 2023-10-30
 

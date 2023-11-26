@@ -27,7 +27,7 @@ func TestReadUntilErrs(t *testing.T) {
 	conf.ReadUntil.Input = &inConf
 
 	_, err := bmock.NewManager().NewInput(conf)
-	assert.EqualError(t, err, "failed to init input <no label>: a check query is required")
+	assert.EqualError(t, err, "failed to init input <no label>: it is required to set either check or idle_timeout")
 }
 
 func TestReadUntilInput(t *testing.T) {
@@ -267,4 +267,29 @@ remainingLoop:
 	if err = in.WaitForClose(ctx); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestReadUntilTimeout(t *testing.T) {
+	conf := input.NewConfig()
+	require.NoError(t, yaml.Unmarshal([]byte(`
+read_until:
+  idle_timeout: 100ms
+  input:
+    generate:
+      count: 1000
+      interval: 1s
+      mapping: 'root.id = counter()'
+`), &conf))
+
+	strm, err := bmock.NewManager().NewInput(conf)
+	require.NoError(t, err)
+
+	tran, open := <-strm.TransactionChan()
+	require.True(t, open)
+	require.Len(t, tran.Payload, 1)
+	assert.Equal(t, `{"id":1}`, string(tran.Payload[0].AsBytes()))
+	require.NoError(t, tran.Ack(context.Background(), nil))
+
+	_, open = <-strm.TransactionChan()
+	require.False(t, open)
 }
