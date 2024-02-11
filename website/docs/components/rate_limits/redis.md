@@ -32,7 +32,7 @@ Introduced in version 4.12.0.
 # Common config fields, showing default values
 label: ""
 redis:
-  url: :6397 # No default (required)
+  url: redis://:6397 # No default (required)
   count: 1000
   interval: 1s
   key: "" # No default (required)
@@ -45,7 +45,7 @@ redis:
 # All config fields, showing default values
 label: ""
 redis:
-  url: :6397 # No default (required)
+  url: redis://:6397 # No default (required)
   kind: simple
   master: ""
   tls:
@@ -75,11 +75,11 @@ Type: `string`
 ```yml
 # Examples
 
-url: :6397
-
-url: localhost:6397
+url: redis://:6397
 
 url: redis://localhost:6379
+
+url: redis://foousername:foopassword@redisplace:6379
 
 url: redis://:foopassword@redisplace:6379
 

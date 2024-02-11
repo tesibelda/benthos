@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
 
 	"github.com/benthosdev/benthos/v4/internal/component/metrics"
 	"github.com/benthosdev/benthos/v4/internal/impl/aws/config"
@@ -119,6 +118,18 @@ type cloudWatchStat struct {
 	dimensions []*cloudwatch.Dimension
 }
 
+func (c *cloudWatchStat) SetFloat64(value float64) {
+	c.Set(int64(value))
+}
+
+func (c *cloudWatchStat) IncrFloat64(count float64) {
+	c.Incr(int64(count))
+}
+
+func (c *cloudWatchStat) DecrFloat64(count float64) {
+	c.Decr(int64(count))
+}
+
 // Trims a map of datum values to a ceiling. The primary goal here is to be fast
 // and efficient rather than accurately preserving the most common values.
 func trimValuesMap(m map[int64]int64) {
@@ -184,7 +195,7 @@ func (c *cloudWatchStat) addValue(v int64) {
 	c.root.datumLock.Unlock()
 }
 
-// Incr increments a metric by an amount.
+// Incr increments a metric by an int64 amount.
 func (c *cloudWatchStat) Incr(count int64) {
 	c.addValue(count)
 }
@@ -266,8 +277,12 @@ func (c *cloudWatchGaugeVec) With(labelValues ...string) metrics.StatGauge {
 
 //------------------------------------------------------------------------------
 
+type cloudWatchAPI interface {
+	PutMetricDataWithContext(aws.Context, *cloudwatch.PutMetricDataInput, ...request.Option) (*cloudwatch.PutMetricDataOutput, error)
+}
+
 type cwMetrics struct {
-	client cloudwatchiface.CloudWatchAPI
+	client cloudWatchAPI
 
 	datumses  map[string]*cloudWatchDatum
 	datumLock *sync.Mutex
@@ -473,7 +488,7 @@ func (c *cwMetrics) flush() error {
 		}
 		throttled = false
 
-		if _, err := c.client.PutMetricData(&input); err != nil {
+		if _, err := c.client.PutMetricDataWithContext(context.Background(), &input); err != nil {
 			if request.IsErrorThrottle(err) {
 				throttled = true
 				c.log.Warn("Metrics request was throttled. Either increase flush period or reduce number of services sending metrics.")

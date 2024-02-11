@@ -69,10 +69,15 @@ input:
       user_credentials_file: ./user.creds # No default (optional)
       user_jwt: "" # No default (optional)
       user_nkey_seed: "" # No default (optional)
+    extract_tracing_map: root = @ # No default (optional)
 ```
 
 </TabItem>
 </Tabs>
+
+### Consuming Mirrored Streams
+
+In the case where a stream being consumed is mirrored from a different JetStream domain the stream cannot be resolved from the subject name alone, and so the stream name as well as the subject (if applicable) must both be specified.
 
 ### Metadata
 
@@ -425,5 +430,21 @@ This field contains sensitive information that usually shouldn't be added to a c
 
 
 Type: `string`  
+
+### `extract_tracing_map`
+
+EXPERIMENTAL: A [Bloblang mapping](/docs/guides/bloblang/about) that attempts to extract an object containing tracing propagation information, which will then be used as the root tracing span for the message. The specification of the extracted fields must match the format used by the service wide tracer.
+
+
+Type: `string`  
+Requires version 4.23.0 or newer  
+
+```yml
+# Examples
+
+extract_tracing_map: root = @
+
+extract_tracing_map: root = this.meta.span
+```
 
 

@@ -29,7 +29,7 @@ Pulls messages from Redis (v5.0+) streams with the XREADGROUP command. The `clie
 input:
   label: ""
   redis_streams:
-    url: :6397 # No default (required)
+    url: redis://:6397 # No default (required)
     body_key: body
     streams: [] # No default (required)
     limit: 10
@@ -45,7 +45,7 @@ input:
 input:
   label: ""
   redis_streams:
-    url: :6397 # No default (required)
+    url: redis://:6397 # No default (required)
     kind: simple
     master: ""
     tls:
@@ -83,11 +83,11 @@ Type: `string`
 ```yml
 # Examples
 
-url: :6397
-
-url: localhost:6397
+url: redis://:6397
 
 url: redis://localhost:6379
+
+url: redis://foousername:foopassword@redisplace:6379
 
 url: redis://:foopassword@redisplace:6379
 

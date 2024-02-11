@@ -12,6 +12,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
+	"github.com/benthosdev/benthos/v4/internal/component/input/span"
 	"github.com/benthosdev/benthos/v4/internal/impl/nats/auth"
 	"github.com/benthosdev/benthos/v4/internal/shutdown"
 	"github.com/benthosdev/benthos/v4/public/service"
@@ -24,6 +25,10 @@ func natsJetStreamInputConfig() *service.ConfigSpec {
 		Version("3.46.0").
 		Summary("Reads messages from NATS JetStream subjects.").
 		Description(`
+### Consuming Mirrored Streams
+
+In the case where a stream being consumed is mirrored from a different JetStream domain the stream cannot be resolved from the subject name alone, and so the stream name as well as the subject (if applicable) must both be specified.
+
 ### Metadata
 
 This input adds the following metadata fields to each message:
@@ -79,14 +84,19 @@ You can access these metadata fields using
 			Advanced().
 			Default(1024)).
 		Field(service.NewTLSToggledField("tls")).
-		Field(service.NewInternalField(auth.FieldSpec()))
+		Field(service.NewInternalField(auth.FieldSpec())).
+		Field(span.ExtractTracingSpanMappingDocs().Version(tracingVersion))
 }
 
 func init() {
 	err := service.RegisterInput(
 		"nats_jetstream", natsJetStreamInputConfig(),
 		func(conf *service.ParsedConfig, mgr *service.Resources) (service.Input, error) {
-			return newJetStreamReaderFromConfig(conf, mgr)
+			input, err := newJetStreamReaderFromConfig(conf, mgr)
+			if err != nil {
+				return nil, err
+			}
+			return span.NewInput("nats_jetstream", conf, input, mgr)
 		})
 	if err != nil {
 		panic(err)
@@ -215,7 +225,7 @@ func newJetStreamReaderFromConfig(conf *service.ParsedConfig, mgr *service.Resou
 
 //------------------------------------------------------------------------------
 
-func (j *jetStreamReader) Connect(ctx context.Context) error {
+func (j *jetStreamReader) Connect(ctx context.Context) (err error) {
 	j.connMut.Lock()
 	defer j.connMut.Unlock()
 
@@ -225,7 +235,6 @@ func (j *jetStreamReader) Connect(ctx context.Context) error {
 
 	var natsConn *nats.Conn
 	var natsSub *nats.Subscription
-	var err error
 
 	defer func() {
 		if err != nil {
@@ -291,12 +300,10 @@ func (j *jetStreamReader) Connect(ctx context.Context) error {
 			options = append(options, nats.MaxAckPending(j.maxAckPending))
 		}
 
-		if j.bind {
-			if j.stream != "" && j.durable != "" {
-				options = append(options, nats.Bind(j.stream, j.durable))
-			} else if j.stream != "" {
-				options = append(options, nats.BindStream(j.stream))
-			}
+		if j.bind && j.stream != "" && j.durable != "" {
+			options = append(options, nats.Bind(j.stream, j.durable))
+		} else if j.stream != "" {
+			options = append(options, nats.BindStream(j.stream))
 		}
 
 		if j.queue == "" {

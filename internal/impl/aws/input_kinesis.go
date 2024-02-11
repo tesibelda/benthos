@@ -13,13 +13,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/aws/aws-sdk-go/service/kinesis/kinesisiface"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gofrs/uuid"
 
 	"github.com/benthosdev/benthos/v4/internal/component"
 	"github.com/benthosdev/benthos/v4/internal/impl/aws/config"
-	"github.com/benthosdev/benthos/v4/internal/old/util/retries"
 	"github.com/benthosdev/benthos/v4/public/service"
 )
 
@@ -180,10 +178,9 @@ type kinesisReader struct {
 	log     *service.Logger
 	mgr     *service.Resources
 
-	backoffCtor func() backoff.BackOff
-	boffPool    sync.Pool
+	boffPool sync.Pool
 
-	svc          kinesisiface.KinesisAPI
+	svc          *kinesis.Kinesis
 	checkpointer *awsKinesisCheckpointer
 
 	streamShards    map[string][]string
@@ -243,15 +240,13 @@ func newKinesisReaderFromConfig(conf kiConfig, batcher service.BatchPolicy, sess
 	}
 	k.clientID = u4.String()
 
-	rConf := retries.NewConfig()
-	rConf.Backoff.InitialInterval = "300ms"
-	rConf.Backoff.MaxInterval = "5s"
-	if k.backoffCtor, err = rConf.GetCtor(); err != nil {
-		return nil, err
-	}
 	k.boffPool = sync.Pool{
 		New: func() any {
-			return k.backoffCtor()
+			boff := backoff.NewExponentialBackOff()
+			boff.InitialInterval = time.Millisecond * 300
+			boff.MaxInterval = time.Second * 5
+			boff.MaxElapsedTime = 0
+			return boff
 		},
 	}
 

@@ -62,6 +62,9 @@ output:
     key: "" # No default (optional)
     partitioner: "" # No default (optional)
     partition: ${! meta("partition") } # No default (optional)
+    client_id: benthos
+    rack_id: ""
+    idempotent_write: true
     metadata:
       include_prefixes: []
       include_patterns: []
@@ -160,6 +163,30 @@ Type: `string`
 
 partition: ${! meta("partition") }
 ```
+
+### `client_id`
+
+An identifier for the client connection.
+
+
+Type: `string`  
+Default: `"benthos"`  
+
+### `rack_id`
+
+A rack identifier for this client.
+
+
+Type: `string`  
+Default: `""`  
+
+### `idempotent_write`
+
+Enable the idempotent write producer option. This requires the `IDEMPOTENT_WRITE` permission on `CLUSTER` and can be disabled if this permission is not available.
+
+
+Type: `bool`  
+Default: `true`  
 
 ### `metadata`
 

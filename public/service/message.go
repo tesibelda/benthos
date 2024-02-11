@@ -5,8 +5,9 @@ import (
 	"errors"
 
 	"github.com/benthosdev/benthos/v4/internal/bloblang/mapping"
-	"github.com/benthosdev/benthos/v4/internal/bloblang/query"
 	"github.com/benthosdev/benthos/v4/internal/message"
+	"github.com/benthosdev/benthos/v4/internal/transaction"
+	"github.com/benthosdev/benthos/v4/internal/value"
 	"github.com/benthosdev/benthos/v4/public/bloblang"
 )
 
@@ -287,7 +288,7 @@ func (m *Message) MetaGet(key string) (string, bool) {
 	if !exists {
 		return "", false
 	}
-	return query.IToString(v), true
+	return value.IToString(v), true
 }
 
 // MetaGetMut attempts to find a metadata key from the message and returns the
@@ -373,15 +374,47 @@ func (m *Message) BloblangQuery(blobl *bloblang.Executor) (*Message, error) {
 // fails. If the mapping results in the root being deleted the returned message
 // will be nil, which indicates it has been filtered.
 //
-// Note that using overlay means certain functions within the Bloblang mapping
-// will behave differently. In the root of the mapping the right-hand keywords
-// `root` and `this` refer to the same mutable root of the output document.
+// Note that using a Mutate execution means certain functions within the
+// Bloblang mapping will behave differently. In the root of the mapping the
+// right-hand keywords `root` and `this` refer to the same mutable root of the
+// output document.
 func (m *Message) BloblangMutate(blobl *bloblang.Executor) (*Message, error) {
 	uw := blobl.XUnwrapper().(interface {
 		Unwrap() *mapping.Executor
 	}).Unwrap()
 
 	msg := message.Batch{m.part}
+
+	res, err := uw.MapOnto(m.part, 0, msg)
+	if err != nil {
+		return nil, err
+	}
+	if res != nil {
+		return NewInternalMessage(res), nil
+	}
+	return nil, nil
+}
+
+// BloblangMutateFrom executes a parsed Bloblang mapping onto a message where
+// the reference material for the mapping comes from a provided message rather
+// than the target message of the map. Contents of the target message are
+// mutated directly rather than creating an entirely new object.
+//
+// Returns the same message back in a mutated form, or an error if the mapping
+// fails. If the mapping results in the root being deleted the returned message
+// will be nil, which indicates it has been filtered.
+//
+// Note that using a MutateFrom execution means certain functions within the
+// Bloblang mapping will behave differently. In the root of the mapping the
+// right-hand keyword `root` refers to the same mutable root of the output
+// document, but the keyword `this` refers to the message being provided as an
+// argument.
+func (m *Message) BloblangMutateFrom(blobl *bloblang.Executor, from *Message) (*Message, error) {
+	uw := blobl.XUnwrapper().(interface {
+		Unwrap() *mapping.Executor
+	}).Unwrap()
+
+	msg := message.Batch{from.part}
 
 	res, err := uw.MapOnto(m.part, 0, msg)
 	if err != nil {
@@ -514,4 +547,17 @@ func (b MessageBatch) InterpolatedBytes(index int, i *InterpolatedString) []byte
 	}
 	bRes, _ := i.expr.Bytes(index, msg)
 	return bRes
+}
+
+// AddSyncResponse attempts to add this batch of messages, in its exact current
+// condition, to the synchronous response destined for the original source input
+// of this data. Synchronous responses aren't supported by all inputs, and so
+// it's possible that attempting to mark a batch as ready for a synchronous
+// response will return an error.
+func (b MessageBatch) AddSyncResponse() error {
+	parts := make([]*message.Part, len(b))
+	for i, m := range b {
+		parts[i] = m.part
+	}
+	return transaction.SetAsResponse(parts)
 }

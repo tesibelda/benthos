@@ -13,14 +13,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
-	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	"github.com/cenkalti/backoff/v4"
 
-	"github.com/benthosdev/benthos/v4/internal/bloblang/query"
 	"github.com/benthosdev/benthos/v4/internal/component"
 	"github.com/benthosdev/benthos/v4/internal/component/output"
 	"github.com/benthosdev/benthos/v4/internal/impl/aws/config"
 	"github.com/benthosdev/benthos/v4/internal/impl/pure"
+	"github.com/benthosdev/benthos/v4/internal/value"
 	"github.com/benthosdev/benthos/v4/public/service"
 )
 
@@ -29,6 +28,7 @@ const (
 	sqsoFieldURL             = "url"
 	sqsoFieldMessageGroupID  = "message_group_id"
 	sqsoFieldMessageDedupeID = "message_deduplication_id"
+	sqsoFieldDelaySeconds    = "delay_seconds"
 	sqsoFieldMetadata        = "metadata"
 	sqsoFieldBatching        = "batching"
 
@@ -39,6 +39,7 @@ type sqsoConfig struct {
 	URL                    string
 	MessageGroupID         *service.InterpolatedString
 	MessageDeduplicationID *service.InterpolatedString
+	DelaySeconds           *service.InterpolatedString
 
 	Metadata    *service.MetadataExcludeFilter
 	session     *session.Session
@@ -56,6 +57,11 @@ func sqsoConfigFromParsed(pConf *service.ParsedConfig) (conf sqsoConfig, err err
 	}
 	if pConf.Contains(sqsoFieldMessageDedupeID) {
 		if conf.MessageDeduplicationID, err = pConf.FieldInterpolatedString(sqsoFieldMessageDedupeID); err != nil {
+			return
+		}
+	}
+	if pConf.Contains(sqsoFieldDelaySeconds) {
+		if conf.DelaySeconds, err = pConf.FieldInterpolatedString(sqsoFieldDelaySeconds); err != nil {
 			return
 		}
 	}
@@ -80,7 +86,7 @@ func sqsoOutputSpec() *service.ConfigSpec {
 		Description(output.Description(true, true, `
 Metadata values are sent along with the payload as attributes with the data type String. If the number of metadata values in a message exceeds the message attribute limit (10) then the top ten keys ordered alphabetically will be selected.
 
-The fields `+"`message_group_id` and `message_deduplication_id`"+` can be set dynamically using [function interpolations](/docs/configuration/interpolation#bloblang-queries), which are resolved individually for each message of a batch.
+The fields `+"`message_group_id`, `message_deduplication_id` and `delay_seconds`"+` can be set dynamically using [function interpolations](/docs/configuration/interpolation#bloblang-queries), which are resolved individually for each message of a batch.
 
 ### Credentials
 
@@ -92,6 +98,9 @@ By default Benthos will use a shared credentials file when connecting to AWS ser
 				Optional(),
 			service.NewInterpolatedStringField(sqsoFieldMessageDedupeID).
 				Description("An optional deduplication ID to set for messages.").
+				Optional(),
+			service.NewInterpolatedStringField(sqsoFieldDelaySeconds).
+				Description("An optional delay time in seconds for message. Value between 0 and 900").
 				Optional(),
 			service.NewOutputMaxInFlightField().
 				Description("The maximum number of parallel message batches to have in flight at any given time."),
@@ -126,7 +135,7 @@ func init() {
 
 type sqsWriter struct {
 	conf sqsoConfig
-	sqs  sqsiface.SQSAPI
+	sqs  sqsAPI
 
 	closer    sync.Once
 	closeChan chan struct{}
@@ -154,10 +163,11 @@ func (a *sqsWriter) Connect(ctx context.Context) error {
 }
 
 type sqsAttributes struct {
-	attrMap  map[string]*sqs.MessageAttributeValue
-	groupID  *string
-	dedupeID *string
-	content  *string
+	attrMap      map[string]*sqs.MessageAttributeValue
+	groupID      *string
+	dedupeID     *string
+	delaySeconds *int64
+	content      *string
 }
 
 var sqsAttributeKeyInvalidCharRegexp = regexp.MustCompile(`(^\.)|(\.\.)|(^aws\.)|(^amazon\.)|(\.$)|([^a-z0-9_\-.]+)`)
@@ -170,7 +180,7 @@ func (a *sqsWriter) getSQSAttributes(batch service.MessageBatch, i int) (sqsAttr
 	msg := batch[i]
 	keys := []string{}
 	_ = a.conf.Metadata.WalkMut(msg, func(k string, v any) error {
-		if isValidSQSAttribute(k, query.IToString(v)) {
+		if isValidSQSAttribute(k, value.IToString(v)) {
 			keys = append(keys, k)
 		} else {
 			a.log.Debugf("Rejecting metadata key '%v' due to invalid characters\n", k)
@@ -195,6 +205,7 @@ func (a *sqsWriter) getSQSAttributes(batch service.MessageBatch, i int) (sqsAttr
 	}
 
 	var groupID, dedupeID *string
+	var delaySeconds *int64
 	if a.conf.MessageGroupID != nil {
 		groupIDStr, err := batch.TryInterpolatedString(i, a.conf.MessageGroupID)
 		if err != nil {
@@ -209,6 +220,20 @@ func (a *sqsWriter) getSQSAttributes(batch service.MessageBatch, i int) (sqsAttr
 		}
 		dedupeID = aws.String(dedupeIDStr)
 	}
+	if a.conf.DelaySeconds != nil {
+		delaySecondsStr, err := batch.TryInterpolatedString(i, a.conf.DelaySeconds)
+		if err != nil {
+			return sqsAttributes{}, fmt.Errorf("delay seconds interpolation: %w", err)
+		}
+		delaySecondsInt64, err := strconv.ParseInt(delaySecondsStr, 10, 64)
+		if err != nil {
+			return sqsAttributes{}, fmt.Errorf("delay seconds invalid input: %w", err)
+		}
+		if delaySecondsInt64 < 0 || delaySecondsInt64 > 900 {
+			return sqsAttributes{}, fmt.Errorf("delay seconds must be between 0 and 900")
+		}
+		delaySeconds = aws.Int64(delaySecondsInt64)
+	}
 
 	msgBytes, err := msg.AsBytes()
 	if err != nil {
@@ -216,10 +241,11 @@ func (a *sqsWriter) getSQSAttributes(batch service.MessageBatch, i int) (sqsAttr
 	}
 
 	return sqsAttributes{
-		attrMap:  values,
-		groupID:  groupID,
-		dedupeID: dedupeID,
-		content:  aws.String(string(msgBytes)),
+		attrMap:      values,
+		groupID:      groupID,
+		dedupeID:     dedupeID,
+		delaySeconds: delaySeconds,
+		content:      aws.String(string(msgBytes)),
 	}, nil
 }
 
@@ -248,6 +274,7 @@ func (a *sqsWriter) WriteBatch(ctx context.Context, batch service.MessageBatch) 
 			MessageAttributes:      attrs.attrMap,
 			MessageGroupId:         attrs.groupID,
 			MessageDeduplicationId: attrs.dedupeID,
+			DelaySeconds:           attrs.delaySeconds,
 		})
 	}
 
@@ -268,7 +295,7 @@ func (a *sqsWriter) WriteBatch(ctx context.Context, batch service.MessageBatch) 
 		wait := backOff.NextBackOff()
 
 		var batchResult *sqs.SendMessageBatchOutput
-		if batchResult, err = a.sqs.SendMessageBatch(input); err != nil {
+		if batchResult, err = a.sqs.SendMessageBatchWithContext(ctx, input); err != nil {
 			a.log.Warnf("SQS error: %v\n", err)
 			// bail if a message is too large or all retry attempts expired
 			if wait == backoff.Stop {

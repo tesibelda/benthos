@@ -75,9 +75,6 @@ type mongodbCache struct {
 }
 
 func newMongodbCache(collectionName, keyField, valueField string, client *mongo.Client, database *mongo.Database) (*mongodbCache, error) {
-	if err := client.Connect(context.Background()); err != nil {
-		return nil, err
-	}
 	return &mongodbCache{
 		client:     client,
 		collection: database.Collection(collectionName),
@@ -88,7 +85,7 @@ func newMongodbCache(collectionName, keyField, valueField string, client *mongo.
 
 func (m *mongodbCache) Get(ctx context.Context, key string) ([]byte, error) {
 	filter := bson.M{m.keyField: key}
-	document, err := m.collection.FindOne(ctx, filter).DecodeBytes()
+	document, err := m.collection.FindOne(ctx, filter).Raw()
 	if err != nil {
 		return nil, service.ErrKeyNotFound
 	}

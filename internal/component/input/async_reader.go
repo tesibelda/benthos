@@ -105,9 +105,9 @@ func (r *AsyncReader) loop() {
 
 	pendingAcks := sync.WaitGroup{}
 	defer func() {
-		r.mgr.Logger().Debugln("Waiting for pending acks to resolve before shutting down.")
+		r.mgr.Logger().Debug("Waiting for pending acks to resolve before shutting down.")
 		pendingAcks.Wait()
-		r.mgr.Logger().Debugln("Pending acks resolved.")
+		r.mgr.Logger().Debug("Pending acks resolved.")
 	}()
 
 	initConnection := func() bool {
@@ -119,18 +119,23 @@ func (r *AsyncReader) loop() {
 				if r.shutSig.ShouldCloseAtLeisure() || errors.Is(err, component.ErrTypeClosed) {
 					return false
 				}
-				r.mgr.Logger().Errorf("Failed to connect to %v: %v\n", r.typeStr, err)
+				r.mgr.Logger().Error("Failed to connect to %v: %v\n", r.typeStr, err)
 				mFailedConn.Incr(1)
 
-				nextBoff := r.connBackoff.NextBackOff()
-				if nextBoff == backoff.Stop {
-					r.mgr.Logger().Errorf("Maximum number of connection attempt retries has been met, gracefully terminating input %v", r.typeStr)
-					return false
+				var nextBoff time.Duration
+
+				var e *component.ErrBackOff
+				if errors.As(err, &e) {
+					nextBoff = e.Wait
+				} else {
+					nextBoff = r.connBackoff.NextBackOff()
 				}
 
-				select {
-				case <-time.After(nextBoff):
-				case <-closeAtLeisureCtx.Done():
+				if nextBoff == backoff.Stop {
+					r.mgr.Logger().Error("Maximum number of connection attempt retries has been met, gracefully terminating input %v", r.typeStr)
+					return false
+				}
+				if sleepWithCancellation(closeAtLeisureCtx, nextBoff) != nil {
 					return false
 				}
 			} else {
@@ -168,12 +173,13 @@ func (r *AsyncReader) loop() {
 		}
 
 		if err != nil || len(msg) == 0 {
-			if err != nil && err != component.ErrTimeout && err != component.ErrNotConnected {
-				r.mgr.Logger().Errorf("Failed to read message: %v\n", err)
+			if err != nil && !errors.Is(err, component.ErrTimeout) && !errors.Is(err, component.ErrNotConnected) {
+				r.mgr.Logger().Error("Failed to read message: %v\n", err)
 			}
+
 			nextBoff := r.readBackoff.NextBackOff()
 			if nextBoff == backoff.Stop {
-				r.mgr.Logger().Errorf("Maximum number of read attempt retries has been met, gracefully terminating input %v", r.typeStr)
+				r.mgr.Logger().Error("Maximum number of read attempt retries has been met, gracefully terminating input %v", r.typeStr)
 				return
 			}
 			select {
@@ -185,7 +191,7 @@ func (r *AsyncReader) loop() {
 		} else {
 			r.readBackoff.Reset()
 			mRcvd.Incr(int64(msg.Len()))
-			r.mgr.Logger().Tracef("Consumed %v messages from '%v'.\n", msg.Len(), r.typeStr)
+			r.mgr.Logger().Trace("Consumed %v messages from '%v'.\n", msg.Len(), r.typeStr)
 		}
 
 		startedAt := time.Now()
@@ -219,7 +225,7 @@ func (r *AsyncReader) loop() {
 			tracing.FinishSpans(m)
 
 			if err = aFn(closeNowCtx, res); err != nil {
-				r.mgr.Logger().Errorf("Failed to acknowledge message: %v\n", err)
+				r.mgr.Logger().Error("Failed to acknowledge message: %v\n", err)
 			}
 		}(msg, ackFn, resChan)
 	}
@@ -259,4 +265,16 @@ func (r *AsyncReader) WaitForClose(ctx context.Context) error {
 		return ctx.Err()
 	}
 	return nil
+}
+
+func sleepWithCancellation(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

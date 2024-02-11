@@ -21,11 +21,11 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/benthosdev/benthos/v4/internal/api"
 	"github.com/benthosdev/benthos/v4/internal/component/input"
 	"github.com/benthosdev/benthos/v4/internal/component/metrics"
+	"github.com/benthosdev/benthos/v4/internal/component/testutil"
 	"github.com/benthosdev/benthos/v4/internal/log"
 	"github.com/benthosdev/benthos/v4/internal/manager"
 	"github.com/benthosdev/benthos/v4/internal/manager/mock"
@@ -40,7 +40,7 @@ type apiRegGorillaMutWrapper struct {
 }
 
 func (a apiRegGorillaMutWrapper) RegisterEndpoint(path, desc string, h http.HandlerFunc) {
-	a.mut.PathPrefix(path).Handler(h)
+	api.GetMuxRoute(a.mut, path).Handler(h)
 }
 
 func TestHTTPBasic(t *testing.T) {
@@ -52,7 +52,7 @@ func TestHTTPBasic(t *testing.T) {
 	nTestLoops := 100
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	require.NoError(t, err)
 
 	conf := parseYAMLInputConf(t, `
@@ -203,8 +203,9 @@ func getFreePort(t testing.TB) int {
 	listener, err := net.ListenTCP("tcp", addr)
 	require.NoError(t, err)
 
-	defer listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port
+	port := listener.Addr().(*net.TCPAddr).Port
+	require.NoError(t, listener.Close())
+	return port
 }
 
 func TestHTTPServerLifecycle(t *testing.T) {
@@ -231,7 +232,7 @@ func TestHTTPServerLifecycle(t *testing.T) {
 		_ = apiImpl.Shutdown(context.Background())
 	}()
 
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(apiImpl))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(apiImpl))
 	require.NoError(t, err)
 
 	conf := parseYAMLInputConf(t, `
@@ -272,7 +273,7 @@ http_server:
 
 	res, err := http.Post(testURL, "text/plain", bytes.NewReader(dummyData))
 	assert.NoError(t, err)
-	assert.Equal(t, 404, res.StatusCode)
+	assert.Equal(t, 503, res.StatusCode)
 
 	serverTwo, err := mgr.NewInput(conf)
 	require.NoError(t, err)
@@ -297,7 +298,7 @@ func TestHTTPServerMetadata(t *testing.T) {
 	defer done()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	require.NoError(t, err)
 
 	conf := parseYAMLInputConf(t, `
@@ -362,7 +363,7 @@ func TestHTTPServerPathParameters(t *testing.T) {
 	defer done()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	require.NoError(t, err)
 
 	conf := parseYAMLInputConf(t, `
@@ -429,12 +430,12 @@ func TestHTTPServerPathIsPrefix(t *testing.T) {
 	defer done()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	require.NoError(t, err)
 
 	conf := parseYAMLInputConf(t, `
 http_server:
-  path: /test/{foo}/{bar}
+  path: /test/{foo}/{bar}/
   allowed_verbs: [ "POST", "PUT" ]
 `)
 	server, err := mgr.NewInput(conf)
@@ -520,12 +521,17 @@ http_server:
 
 	dummyData := []byte("a bunch of jolly leprechauns await")
 	go func() {
-		req, cerr := http.NewRequest("POST", serverURL.String(), bytes.NewReader(dummyData))
-		require.NoError(t, cerr)
-		req.Header.Set("Content-Type", "text/plain")
-		resp, cerr := http.DefaultClient.Do(req)
-		require.NoError(t, cerr)
-		defer resp.Body.Close()
+		assert.Eventually(t, func() (succeeded bool) {
+			req, cerr := http.NewRequest("POST", serverURL.String(), bytes.NewReader(dummyData))
+			require.NoError(t, cerr)
+			req.Header.Set("Content-Type", "text/plain")
+
+			if resp, cerr := http.DefaultClient.Do(req); cerr == nil {
+				succeeded = true
+				_ = resp.Body.Close()
+			}
+			return
+		}, time.Second, 50*time.Millisecond)
 	}()
 
 	readNextMsg := func() (message.Batch, error) {
@@ -561,7 +567,7 @@ func TestHTTPServerPathParametersCustomServerPathIsPrefix(t *testing.T) {
 	conf := parseYAMLInputConf(t, `
 http_server:
   address: 0.0.0.0:%v
-  path: /test/{foo}/{bar}
+  path: /test/{foo}/{bar}/
 `, freePort)
 
 	server, err := mock.NewManager().NewInput(conf)
@@ -582,12 +588,17 @@ http_server:
 
 	dummyData := []byte("a bunch of jolly leprechauns await")
 	go func() {
-		req, cerr := http.NewRequest("POST", serverURL.String(), bytes.NewReader(dummyData))
-		require.NoError(t, cerr)
-		req.Header.Set("Content-Type", "text/plain")
-		resp, cerr := http.DefaultClient.Do(req)
-		require.NoError(t, cerr)
-		defer resp.Body.Close()
+		require.Eventually(t, func() (succeeded bool) {
+			req, cerr := http.NewRequest("POST", serverURL.String(), bytes.NewReader(dummyData))
+			require.NoError(t, cerr)
+			req.Header.Set("Content-Type", "text/plain")
+
+			if resp, cerr := http.DefaultClient.Do(req); cerr == nil {
+				succeeded = true
+				_ = resp.Body.Close()
+			}
+			return
+		}, time.Second, 50*time.Millisecond)
 	}()
 
 	readNextMsg := func() (message.Batch, error) {
@@ -621,7 +632,7 @@ func TestHTTPBadRequests(t *testing.T) {
 	defer done()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +668,7 @@ func TestHTTPTimeout(t *testing.T) {
 	t.Parallel()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -701,14 +712,14 @@ func TestHTTPRateLimit(t *testing.T) {
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
 
-	mgrConf := manager.NewResourceConfig()
-	require.NoError(t, yaml.Unmarshal([]byte(`
+	mgrConf, err := testutil.ManagerFromYAML(`
 rate_limit_resources:
   - label: foorl
     local:
       count: 1
       interval: 60s
-`), &mgrConf))
+`)
+	require.NoError(t, err)
 
 	mgr, err := manager.New(mgrConf, manager.OptSetAPIReg(reg))
 	if err != nil {
@@ -776,7 +787,7 @@ func TestHTTPServerWebsockets(t *testing.T) {
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
 
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -861,14 +872,14 @@ func TestHTTPServerWSRateLimit(t *testing.T) {
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
 
-	mgrConf := manager.NewResourceConfig()
-	require.NoError(t, yaml.Unmarshal([]byte(`
+	mgrConf, err := testutil.ManagerFromYAML(`
 rate_limit_resources:
   - label: foorl
     local:
       count: 1
       interval: 60s
-`), &mgrConf))
+`)
+	require.NoError(t, err)
 
 	mgr, err := manager.New(mgrConf, manager.OptSetAPIReg(reg))
 	if err != nil {
@@ -950,7 +961,7 @@ func TestHTTPSyncResponseHeaders(t *testing.T) {
 	t.Parallel()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1099,7 +1110,7 @@ func TestHTTPSyncResponseMultipart(t *testing.T) {
 	t.Parallel()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	require.NoError(t, err)
 
 	conf := parseYAMLInputConf(t, `
@@ -1175,7 +1186,7 @@ func TestHTTPSyncResponseHeadersStatus(t *testing.T) {
 	t.Parallel()
 
 	reg := apiRegGorillaMutWrapper{mut: mux.NewRouter()}
-	mgr, err := manager.New(manager.NewResourceConfig(), manager.OptSetAPIReg(reg))
+	mgr, err := manager.New(manager.ResourceConfig{}, manager.OptSetAPIReg(reg))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1306,16 +1317,21 @@ http_server:
 		assert.NoError(t, server.WaitForClose(tCtx))
 	}()
 
-	req, cerr := http.NewRequest("OPTIONS", fmt.Sprintf("http://localhost:%v/test/foo1/bar1", freePort), http.NoBody)
-	require.NoError(t, cerr)
+	var resp *http.Response
+	require.Eventually(t, func() (succeeded bool) {
+		req, cerr := http.NewRequest("OPTIONS", fmt.Sprintf("http://localhost:%v/test/foo1/bar1", freePort), http.NoBody)
+		require.NoError(t, cerr)
 
-	req.Header.Add("Origin", "foo")
-	req.Header.Add("Access-Control-Request-Method", "POST")
-	req.Header.Set("Content-Type", "text/plain")
+		req.Header.Add("Origin", "foo")
+		req.Header.Add("Access-Control-Request-Method", "POST")
+		req.Header.Set("Content-Type", "text/plain")
 
-	resp, cerr := http.DefaultClient.Do(req)
-	require.NoError(t, cerr)
-	resp.Body.Close()
+		if resp, cerr = http.DefaultClient.Do(req); cerr == nil {
+			succeeded = true
+			resp.Body.Close()
+		}
+		return
+	}, time.Second, 50*time.Millisecond)
 
 	assert.Equal(t, "200 OK", resp.Status)
 	assert.Equal(t, "foo", resp.Header.Get("Access-Control-Allow-Origin"))

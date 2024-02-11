@@ -21,6 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/klauspost/compress/gzip"
 
+	"github.com/benthosdev/benthos/v4/internal/api"
 	"github.com/benthosdev/benthos/v4/internal/bundle"
 	"github.com/benthosdev/benthos/v4/internal/component/input"
 	"github.com/benthosdev/benthos/v4/internal/component/interop"
@@ -172,7 +173,7 @@ It's possible to return a response for each message received using [synchronous 
 
 ### Endpoints
 
-The following fields specify endpoints that are registered for sending messages, and support path parameters of the form `+"`/{foo}`"+`, which are added to ingested messages as metadata:
+The following fields specify endpoints that are registered for sending messages, and support path parameters of the form `+"`/{foo}`"+`, which are added to ingested messages as metadata. A path ending in `+"`/`"+` will match against all extensions of that path:
 
 #### `+"`path` (defaults to `/post`)"+`
 
@@ -183,6 +184,8 @@ If the request contains a multipart `+"`content-type`"+` header as per [rfc1341]
 #### `+"`ws_path` (defaults to `/post/ws`)"+`
 
 Creates a websocket connection, where payloads received on the socket are passed through the pipeline as a batch of one message.
+
+`+api.EndpointCaveats()+`
 
 You may specify an optional `+"`ws_welcome_message`"+`, which is a static payload to be sent to all clients once a websocket connection is first established.
 
@@ -255,7 +258,7 @@ You can access these metadata fields using [function interpolation](/docs/config
 					Default("200"),
 				service.NewInterpolatedStringMapField(hsiFieldResponseHeaders).
 					Description("Specify headers to return with synchronous responses.").
-					Default(map[string]string{
+					Default(map[string]any{
 						"Content-Type": "application/octet-stream",
 					}),
 				service.NewMetadataFilterField(hsiFieldResponseExtractMetadata).
@@ -343,10 +346,10 @@ func newHTTPServerInput(conf hsiConfig, mgr bundle.NewManagement) (input.Streame
 	wsHdlr := gzipHandler(h.wsHandler)
 	if gMux != nil {
 		if len(h.conf.Path) > 0 {
-			gMux.PathPrefix(h.conf.Path).Handler(postHdlr)
+			api.GetMuxRoute(gMux, h.conf.Path).Handler(postHdlr)
 		}
 		if len(h.conf.WSPath) > 0 {
-			gMux.PathPrefix(h.conf.WSPath).Handler(wsHdlr)
+			api.GetMuxRoute(gMux, h.conf.WSPath).Handler(wsHdlr)
 		}
 	} else {
 		if len(h.conf.Path) > 0 {
@@ -467,6 +470,11 @@ func (h *httpServerInput) extractMessageFromRequest(r *http.Request) (message.Ba
 }
 
 func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
+	if h.shutSig.ShouldCloseAtLeisure() {
+		http.Error(w, "Server closing", http.StatusServiceUnavailable)
+		return
+	}
+
 	h.handlerWG.Add(1)
 	defer h.handlerWG.Done()
 	defer r.Body.Close()
@@ -483,12 +491,12 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 			tUntil, err = rl.Access(r.Context())
 		}); rerr != nil {
 			http.Error(w, "Server error", http.StatusBadGateway)
-			h.log.Warnf("Failed to access rate limit: %v\n", rerr)
+			h.log.Warn("Failed to access rate limit: %v\n", rerr)
 			return
 		}
 		if err != nil {
 			http.Error(w, "Server error", http.StatusBadGateway)
-			h.log.Warnf("Failed to access rate limit: %v\n", err)
+			h.log.Warn("Failed to access rate limit: %v\n", err)
 			return
 		} else if tUntil > 0 {
 			w.Header().Add("Retry-After", strconv.Itoa(int(tUntil.Seconds())))
@@ -500,7 +508,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 	msg, err := h.extractMessageFromRequest(r)
 	if err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
-		h.log.Warnf("Request read failed: %v\n", err)
+		h.log.Warn("Request read failed: %v\n", err)
 		return
 	}
 	defer tracing.FinishSpans(msg)
@@ -511,7 +519,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 	transaction.AddResultStore(msg, store)
 
 	h.mPostRcvd.Incr(int64(msg.Len()))
-	h.log.Tracef("Consumed %v messages from POST to '%v'.\n", msg.Len(), h.conf.Path)
+	h.log.Trace("Consumed %v messages from POST to '%v'.\n", msg.Len(), h.conf.Path)
 
 	resChan := make(chan error, 1)
 	select {
@@ -559,7 +567,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 		for k, v := range h.conf.Response.Headers {
 			headerStr, err := svcBatch.TryInterpolatedString(0, v)
 			if err != nil {
-				h.log.Errorf("Interpolation of response header %v error: %v", k, err)
+				h.log.Error("Interpolation of response header %v error: %v", k, err)
 				continue
 			}
 			w.Header().Set(k, headerStr)
@@ -568,13 +576,13 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 		statusCode := 200
 		statusCodeStr, err := svcBatch.TryInterpolatedString(0, h.conf.Response.Status)
 		if err != nil {
-			h.log.Errorf("Interpolation of response status code error: %v", err)
+			h.log.Error("Interpolation of response status code error: %v", err)
 			w.WriteHeader(http.StatusBadGateway)
 			return
 		}
 		if statusCodeStr != "200" {
 			if statusCode, err = strconv.Atoi(statusCodeStr); err != nil {
-				h.log.Errorf("Failed to parse sync response status code expression: %v\n", err)
+				h.log.Error("Failed to parse sync response status code expression: %v\n", err)
 				w.WriteHeader(http.StatusBadGateway)
 				return
 			}
@@ -588,7 +596,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 			})
 			payload, err := part.AsBytes()
 			if err != nil {
-				h.log.Errorf("Failed to extract message bytes for sync response: %v\n", err)
+				h.log.Error("Failed to extract message bytes for sync response: %v\n", err)
 				w.WriteHeader(http.StatusBadGateway)
 				return
 			}
@@ -612,7 +620,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 				})
 				payload, err := part.AsBytes()
 				if err != nil {
-					h.log.Errorf("Failed to extract message bytes for sync response: %v\n", err)
+					h.log.Error("Failed to extract message bytes for sync response: %v\n", err)
 					continue
 				}
 
@@ -620,7 +628,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 				if customContentTypeExists {
 					contentTypeStr, err := svcBatch.TryInterpolatedString(i, customContentType)
 					if err != nil {
-						h.log.Errorf("Interpolation of content-type header error: %v", err)
+						h.log.Error("Interpolation of content-type header error: %v", err)
 						mimeHeader.Set("Content-Type", http.DetectContentType(payload))
 					} else {
 						mimeHeader.Set("Content-Type", contentTypeStr)
@@ -642,7 +650,7 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(statusCode)
 				_, _ = buf.WriteTo(w)
 			} else {
-				h.log.Errorf("Failed to return sync response: %v\n", merr)
+				h.log.Error("Failed to return sync response: %v\n", merr)
 				w.WriteHeader(http.StatusBadGateway)
 			}
 		}
@@ -650,6 +658,11 @@ func (h *httpServerInput) postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
+	if h.shutSig.ShouldCloseAtLeisure() {
+		http.Error(w, "Server closing", http.StatusServiceUnavailable)
+		return
+	}
+
 	h.handlerWG.Add(1)
 	defer h.handlerWG.Done()
 
@@ -657,7 +670,7 @@ func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
-			h.log.Warnf("Websocket request failed: %v\n", err)
+			h.log.Warn("Websocket request failed: %v\n", err)
 		}
 	}()
 
@@ -674,7 +687,7 @@ func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if welMsg := h.conf.WSWelcomeMessage; len(welMsg) > 0 {
 		if err = ws.WriteMessage(websocket.BinaryMessage, []byte(welMsg)); err != nil {
-			h.log.Errorf("Failed to send welcome message: %v\n", err)
+			h.log.Error("Failed to send welcome message: %v\n", err)
 		}
 	}
 
@@ -692,16 +705,16 @@ func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
 			if rerr := h.mgr.AccessRateLimit(r.Context(), h.conf.RateLimit, func(rl ratelimit.V1) {
 				tUntil, err = rl.Access(r.Context())
 			}); rerr != nil {
-				h.log.Warnf("Failed to access rate limit: %v\n", rerr)
+				h.log.Warn("Failed to access rate limit: %v\n", rerr)
 				err = rerr
 			}
 			if err != nil || tUntil > 0 {
 				if err != nil {
-					h.log.Warnf("Failed to access rate limit: %v\n", err)
+					h.log.Warn("Failed to access rate limit: %v\n", err)
 				}
 				if rlMsg := h.conf.WSRateLimitMessage; len(rlMsg) > 0 {
 					if err = ws.WriteMessage(websocket.BinaryMessage, []byte(rlMsg)); err != nil {
-						h.log.Errorf("Failed to send rate limit message: %v\n", err)
+						h.log.Error("Failed to send rate limit message: %v\n", err)
 					}
 				}
 				continue
@@ -760,7 +773,7 @@ func (h *httpServerInput) wsHandler(w http.ResponseWriter, r *http.Request) {
 			if err := responseMsg.Iter(func(i int, part *message.Part) error {
 				return ws.WriteMessage(websocket.TextMessage, part.AsBytes())
 			}); err != nil {
-				h.log.Errorf("Failed to send sync response over websocket: %v\n", err)
+				h.log.Error("Failed to send sync response over websocket: %v\n", err)
 			}
 		}
 
@@ -774,15 +787,32 @@ func (h *httpServerInput) loop() {
 	defer func() {
 		if h.server != nil {
 			if err := h.server.Shutdown(context.Background()); err != nil {
-				h.log.Errorf("Failed to gracefully terminate http_server: %v\n", err)
+				h.log.Error("Failed to gracefully terminate http_server: %v\n", err)
 			}
 		} else {
-			if len(h.conf.Path) > 0 {
-				h.mgr.RegisterEndpoint(h.conf.Path, "Does nothing.", http.NotFound)
-			}
-			if len(h.conf.WSPath) > 0 {
-				h.mgr.RegisterEndpoint(h.conf.WSPath, "Does nothing.", http.NotFound)
-			}
+			// We are using the service-wide HTTP server. In order to prevent
+			// situations where a slow shutdown results in serving an abundance
+			// of 503 responses we wait until either the current requests are
+			// handled and shutdown can commence, or we've been instructed to
+			// close immediately, which prevents these requests from
+			// indefinitely blocking shutdown.
+			go func() {
+				select {
+				case <-h.shutSig.HasClosedChan():
+				case <-h.shutSig.CloseNowChan():
+				}
+
+				if len(h.conf.Path) > 0 {
+					h.mgr.RegisterEndpoint(h.conf.Path, "Endpoint disabled.", func(w http.ResponseWriter, r *http.Request) {
+						http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+					})
+				}
+				if len(h.conf.WSPath) > 0 {
+					h.mgr.RegisterEndpoint(h.conf.WSPath, "Endpoint disabled.", func(w http.ResponseWriter, r *http.Request) {
+						http.Error(w, "Service unavailable", http.StatusServiceUnavailable)
+					})
+				}
+			}()
 		}
 
 		h.handlerWG.Wait()
@@ -794,22 +824,22 @@ func (h *httpServerInput) loop() {
 	if h.server != nil {
 		go func() {
 			if len(h.conf.KeyFile) > 0 || len(h.conf.CertFile) > 0 {
-				h.log.Infof(
+				h.log.Info(
 					"Receiving HTTPS messages at: https://%s\n",
 					h.conf.Address+h.conf.Path,
 				)
 				if err := h.server.ListenAndServeTLS(
 					h.conf.CertFile, h.conf.KeyFile,
 				); err != http.ErrServerClosed {
-					h.log.Errorf("Server error: %v\n", err)
+					h.log.Error("Server error: %v\n", err)
 				}
 			} else {
-				h.log.Infof(
+				h.log.Info(
 					"Receiving HTTP messages at: http://%s\n",
 					h.conf.Address+h.conf.Path,
 				)
 				if err := h.server.ListenAndServe(); err != http.ErrServerClosed {
-					h.log.Errorf("Server error: %v\n", err)
+					h.log.Error("Server error: %v\n", err)
 				}
 			}
 		}()

@@ -11,9 +11,9 @@ import (
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-cmp/cmp"
 
@@ -118,8 +118,8 @@ This output benefits from sending messages as a batch for improved performance. 
 				Description("The table to store messages in."),
 			service.NewInterpolatedStringMapField(ddboFieldStringColumns).
 				Description("A map of column keys to string values to store.").
-				Default(map[string]string{}).
-				Example(map[string]string{
+				Default(map[string]any{}).
+				Example(map[string]any{
 					"id":           "${!json(\"id\")}",
 					"title":        "${!json(\"body.title\")}",
 					"topic":        "${!meta(\"kafka_topic\")}",
@@ -127,8 +127,8 @@ This output benefits from sending messages as a batch for improved performance. 
 				}),
 			service.NewStringMapField(ddboFieldJSONMapColumns).
 				Description("A map of column keys to [field paths](/docs/configuration/field_paths) pointing to value data within messages.").
-				Default(map[string]string{}).
-				Example(map[string]string{
+				Default(map[string]any{}).
+				Example(map[string]any{
 					"user":           "path.to.user",
 					"whole_document": ".",
 				}).
@@ -171,8 +171,17 @@ func init() {
 	}
 }
 
+type dynamoDBAPI interface {
+	PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error)
+	BatchWriteItem(input *dynamodb.BatchWriteItemInput) (*dynamodb.BatchWriteItemOutput, error)
+	BatchExecuteStatementWithContext(aws.Context, *dynamodb.BatchExecuteStatementInput, ...request.Option) (*dynamodb.BatchExecuteStatementOutput, error)
+	DescribeTable(*dynamodb.DescribeTableInput) (*dynamodb.DescribeTableOutput, error)
+	GetItem(*dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error)
+	DeleteItem(*dynamodb.DeleteItemInput) (*dynamodb.DeleteItemOutput, error)
+}
+
 type dynamoDBWriter struct {
-	client dynamodbiface.DynamoDBAPI
+	client dynamoDBAPI
 	conf   ddboConfig
 	log    *service.Logger
 

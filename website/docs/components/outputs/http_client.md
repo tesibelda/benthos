@@ -69,6 +69,7 @@ output:
       client_secret: ""
       token_url: ""
       scopes: []
+      endpoint_params: {}
     basic_auth:
       enabled: false
       username: ""
@@ -98,7 +99,7 @@ output:
       - 429
     drop_on: []
     successful_on: []
-    proxy_url: ""
+    proxy_url: "" # No default (optional)
     batch_as_multipart: false
     propagate_response: false
     max_in_flight: 64
@@ -339,6 +340,26 @@ A list of optional requested permissions.
 Type: `array`  
 Default: `[]`  
 Requires version 3.45.0 or newer  
+
+### `oauth2.endpoint_params`
+
+A list of optional endpoint parameters, values should be arrays of strings.
+
+
+Type: `object`  
+Default: `{}`  
+Requires version 4.21.0 or newer  
+
+```yml
+# Examples
+
+endpoint_params:
+  bar:
+    - woof
+  foo:
+    - meow
+    - quack
+```
 
 ### `basic_auth`
 
@@ -677,7 +698,6 @@ An optional HTTP proxy URL.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `batch_as_multipart`
 
