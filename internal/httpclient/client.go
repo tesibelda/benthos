@@ -293,12 +293,12 @@ func (h *Client) checkResponse(res *http.Response) (succeeded bool, retStrat ret
 		var bodyString string
 		resolved, retryStrat, bodyString = h.checkBody(res.Body)
 		if resolved {
-			h.log.Debugln(fmt.Sprintf("HTTP response: code %v, body: %v", res.StatusCode, bodyString))
+			h.log.Debugf("HTTP response: code %v, body: %v", res.StatusCode, bodyString)
 		} else {
-			h.log.Warnln(fmt.Sprintf("Unexpected HTTP response: code %v, body: %v", res.StatusCode, bodyString))
+			h.log.Warnf("Unexpected HTTP response: code %v, body: %v", res.StatusCode, bodyString)
 		}
 	} else {
-		h.log.Warnln(fmt.Sprintf("Unexpected HTTP response: code %v", res.StatusCode))
+		h.log.Warnf("Unexpected HTTP response: code %v", res.StatusCode)
 	}
 	return resolved, retryStrat
 }
@@ -328,7 +328,7 @@ func (h *Client) checkStatus(code int) (succeeded bool, retStrat retryStrategy) 
 func (h *Client) checkBody(body io.ReadCloser) (succeeded bool, retStrat retryStrategy, bodystr string) {
 	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
-		h.log.Warnln(fmt.Sprintf("Unexpected HTTP response: could not read body"))
+		h.log.Warnf("Unexpected HTTP response: could not read body")
 		return false, noRetry, ""
 	}
 	bodyString := string(bodyBytes)
