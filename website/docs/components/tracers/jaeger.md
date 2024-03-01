@@ -1,5 +1,6 @@
 ---
 title: jaeger
+slug: jaeger
 type: tracer
 status: stable
 ---
@@ -30,7 +31,7 @@ tracer:
     agent_address: ""
     collector_url: ""
     sampler_type: const
-    flush_interval: ""
+    flush_interval: "" # No default (optional)
 ```
 
 </TabItem>
@@ -45,7 +46,7 @@ tracer:
     sampler_type: const
     sampler_param: 1
     tags: {}
-    flush_interval: ""
+    flush_interval: "" # No default (optional)
 ```
 
 </TabItem>
@@ -117,6 +118,5 @@ The period of time between each flush of tracing spans.
 
 
 Type: `string`  
-Default: `""`  
 
 

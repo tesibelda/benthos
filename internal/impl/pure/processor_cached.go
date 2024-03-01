@@ -130,7 +130,9 @@ func newCachedProcessorFromParsedConf(manager *service.Resources, conf *service.
 		}
 	}
 
-	proc.processors, err = conf.FieldProcessorList("processors")
+	if proc.processors, err = conf.FieldProcessorList("processors"); err != nil {
+		return
+	}
 
 	if conf.Contains("skip_on") {
 		var skipOn *bloblang.Executor
@@ -176,7 +178,7 @@ func (proc *cachedProcessor) Process(ctx context.Context, msg *service.Message) 
 	if err == nil {
 		batch, err := cachedProcResultToBatch(msg, cachedBytes)
 		if err != nil {
-			err = fmt.Errorf("failed to parsed cached result, this indicates the data was not set by this processor: %w", err)
+			err = fmt.Errorf("failed to parse cached result, this indicates the data was not set by this processor: %w", err)
 		}
 		return batch, err
 	}

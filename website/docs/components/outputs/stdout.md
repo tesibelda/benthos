@@ -1,5 +1,6 @@
 ---
 title: stdout
+slug: stdout
 type: output
 status: stable
 categories: ["Local"]
@@ -14,8 +15,7 @@ categories: ["Local"]
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-
-Prints messages to stdout as a continuous stream of data, dividing messages according to the specified codec.
+Prints messages to stdout as a continuous stream of data.
 
 ```yml
 # Config fields, showing default values

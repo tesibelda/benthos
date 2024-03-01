@@ -68,7 +68,7 @@ func (b *Batcher) Add(msg *Message) bool {
 // then the duration returned should be ignored.
 func (b *Batcher) UntilNext() (time.Duration, bool) {
 	t := b.p.UntilNext()
-	if t >= 0 {
+	if t > 0 {
 		return t, true
 	}
 	return 0, false
@@ -102,6 +102,19 @@ func (b BatchPolicy) NewBatcher(res *Resources) (*Batcher, error) {
 		return nil, err
 	}
 	return &Batcher{mgr: mgr, p: p}, nil
+}
+
+type batcherUnwrapper struct {
+	p *policy.Batcher
+}
+
+func (w batcherUnwrapper) Unwrap() *policy.Batcher {
+	return w.p
+}
+
+// XUnwrapper is for internal use only, do not use this.
+func (b *Batcher) XUnwrapper() any {
+	return batcherUnwrapper{p: b.p}
 }
 
 //------------------------------------------------------------------------------

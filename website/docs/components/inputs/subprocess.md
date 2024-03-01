@@ -1,5 +1,6 @@
 ---
 title: subprocess
+slug: subprocess
 type: input
 status: beta
 categories: ["Utility"]
@@ -17,7 +18,6 @@ import TabItem from '@theme/TabItem';
 :::caution BETA
 This component is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with the component is found.
 :::
-
 Executes a command, runs it as a subprocess, and consumes messages from it over stdout.
 
 
@@ -33,7 +33,7 @@ Executes a command, runs it as a subprocess, and consumes messages from it over 
 input:
   label: ""
   subprocess:
-    name: ""
+    name: cat # No default (required)
     args: []
     codec: lines
     restart_on_exit: false
@@ -47,7 +47,7 @@ input:
 input:
   label: ""
   subprocess:
-    name: ""
+    name: cat # No default (required)
     args: []
     codec: lines
     restart_on_exit: false
@@ -71,7 +71,6 @@ The command to execute as a subprocess.
 
 
 Type: `string`  
-Default: `""`  
 
 ```yml
 # Examples

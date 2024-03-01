@@ -1,5 +1,6 @@
 ---
 title: nsq
+slug: nsq
 type: output
 status: stable
 categories: ["Services"]
@@ -29,9 +30,9 @@ Publish to an NSQ topic.
 output:
   label: ""
   nsq:
-    nsqd_tcp_address: ""
-    topic: ""
-    user_agent: ""
+    nsqd_tcp_address: "" # No default (required)
+    topic: "" # No default (required)
+    user_agent: "" # No default (optional)
     max_in_flight: 64
 ```
 
@@ -43,9 +44,9 @@ output:
 output:
   label: ""
   nsq:
-    nsqd_tcp_address: ""
-    topic: ""
-    user_agent: ""
+    nsqd_tcp_address: "" # No default (required)
+    topic: "" # No default (required)
+    user_agent: "" # No default (optional)
     tls:
       enabled: false
       skip_cert_verify: false
@@ -75,7 +76,6 @@ The address of the target NSQD server.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `topic`
 
@@ -84,15 +84,13 @@ This field supports [interpolation functions](/docs/configuration/interpolation#
 
 
 Type: `string`  
-Default: `""`  
 
 ### `user_agent`
 
-A user agent string to connect with.
+A user agent to assume when connecting.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `tls`
 

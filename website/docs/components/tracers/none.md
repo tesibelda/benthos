@@ -1,5 +1,6 @@
 ---
 title: none
+slug: none
 type: tracer
 status: stable
 ---
@@ -18,7 +19,7 @@ Do not send tracing events anywhere.
 ```yml
 # Config fields, showing default values
 tracer:
-  none: null # No default (required)
+  none: {}
 ```
 
 

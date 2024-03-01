@@ -1,5 +1,6 @@
 ---
 title: prometheus
+slug: prometheus
 type: metrics
 status: stable
 ---
@@ -12,7 +13,6 @@ status: stable
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-
 
 Host endpoints (`/metrics` and `/stats`) for Prometheus scraping.
 
@@ -49,8 +49,8 @@ metrics:
         error: 0.001
     add_process_metrics: false
     add_go_metrics: false
-    push_url: ""
-    push_interval: ""
+    push_url: "" # No default (optional)
+    push_interval: "" # No default (optional)
     push_job_name: benthos_push
     push_basic_auth:
       username: ""
@@ -141,7 +141,6 @@ An optional [Push Gateway URL](#push-gateway) to push metrics to.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `push_interval`
 
@@ -149,7 +148,6 @@ The period of time between each push when sending metrics to a Push Gateway.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `push_job_name`
 

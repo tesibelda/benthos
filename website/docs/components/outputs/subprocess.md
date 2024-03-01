@@ -1,5 +1,6 @@
 ---
 title: subprocess
+slug: subprocess
 type: output
 status: beta
 categories: ["Utility"]
@@ -17,7 +18,6 @@ import TabItem from '@theme/TabItem';
 :::caution BETA
 This component is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with the component is found.
 :::
-
 Executes a command, runs it as a subprocess, and writes messages to it over stdin.
 
 ```yml
@@ -25,7 +25,7 @@ Executes a command, runs it as a subprocess, and writes messages to it over stdi
 output:
   label: ""
   subprocess:
-    name: ""
+    name: "" # No default (required)
     args: []
     codec: lines
 ```
@@ -44,7 +44,6 @@ The command to execute as a subprocess.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `args`
 

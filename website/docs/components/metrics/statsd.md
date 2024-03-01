@@ -1,5 +1,6 @@
 ---
 title: statsd
+slug: statsd
 type: metrics
 status: stable
 ---
@@ -13,22 +14,17 @@ status: stable
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-
-Pushes metrics using the [StatsD protocol](https://github.com/statsd/statsd).
-Supported tagging formats are 'none', 'datadog' and 'influxdb'.
+Pushes metrics using the [StatsD protocol](https://github.com/statsd/statsd). Supported tagging formats are 'none', 'datadog' and 'influxdb'.
 
 ```yml
 # Config fields, showing default values
 metrics:
   statsd:
-    address: ""
+    address: "" # No default (required)
     flush_period: 100ms
     tag_format: none
   mapping: ""
 ```
-
-The underlying client library has recently been updated in order to support
-tagging.
 
 ## Fields
 
@@ -38,7 +34,6 @@ The address to send metrics to.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `flush_period`
 

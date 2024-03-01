@@ -1,5 +1,6 @@
 ---
 title: sftp
+slug: sftp
 type: output
 status: beta
 categories: ["Network"]
@@ -17,7 +18,7 @@ import TabItem from '@theme/TabItem';
 :::caution BETA
 This component is mostly stable but breaking changes could still be made outside of major version releases if a fundamental problem with the component is found.
 :::
-Writes files to a server over SFTP.
+Writes files to an SFTP server.
 
 Introduced in version 3.39.0.
 
@@ -26,8 +27,8 @@ Introduced in version 3.39.0.
 output:
   label: ""
   sftp:
-    address: ""
-    path: ""
+    address: "" # No default (required)
+    path: "" # No default (required)
     codec: all-bytes
     credentials:
       username: ""
@@ -49,19 +50,18 @@ message batches) with the field `max_in_flight`.
 
 ### `address`
 
-The address of the server to connect to that has the target files.
+The address of the server to connect to.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `path`
 
 The file to save the messages to on the server.
+This field supports [interpolation functions](/docs/configuration/interpolation#bloblang-queries).
 
 
 Type: `string`  
-Default: `""`  
 
 ### `codec`
 
@@ -91,7 +91,7 @@ codec: delim:foobar
 
 ### `credentials`
 
-The credentials to use to log into the server.
+The credentials to use to log into the target server.
 
 
 Type: `object`  

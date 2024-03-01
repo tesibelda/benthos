@@ -1,5 +1,6 @@
 ---
 title: gcp_cloudtrace
+slug: gcp_cloudtrace
 type: tracer
 status: experimental
 ---
@@ -32,9 +33,9 @@ Introduced in version 4.2.0.
 # Common config fields, showing default values
 tracer:
   gcp_cloudtrace:
-    project: ""
+    project: "" # No default (required)
     sampling_ratio: 1
-    flush_interval: ""
+    flush_interval: "" # No default (optional)
 ```
 
 </TabItem>
@@ -44,10 +45,10 @@ tracer:
 # All config fields, showing default values
 tracer:
   gcp_cloudtrace:
-    project: ""
+    project: "" # No default (required)
     sampling_ratio: 1
     tags: {}
-    flush_interval: ""
+    flush_interval: "" # No default (optional)
 ```
 
 </TabItem>
@@ -61,7 +62,6 @@ The google project with Cloud Trace API enabled. If this is omitted then the Goo
 
 
 Type: `string`  
-Default: `""`  
 
 ### `sampling_ratio`
 
@@ -91,6 +91,5 @@ The period of time between each flush of tracing spans.
 
 
 Type: `string`  
-Default: `""`  
 
 

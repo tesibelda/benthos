@@ -1,5 +1,6 @@
 ---
 title: nanomsg
+slug: nanomsg
 type: output
 status: stable
 categories: ["Network"]
@@ -21,7 +22,7 @@ Send messages over a Nanomsg socket.
 output:
   label: ""
   nanomsg:
-    urls: []
+    urls: [] # No default (required)
     bind: false
     socket_type: PUSH
     poll_timeout: 5s
@@ -44,14 +45,6 @@ A list of URLs to connect to. If an item of the list contains commas it will be 
 
 
 Type: `array`  
-Default: `[]`  
-
-```yml
-# Examples
-
-urls:
-  - tcp://localhost:5556
-```
 
 ### `bind`
 

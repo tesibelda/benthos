@@ -1,5 +1,6 @@
 ---
 title: logger
+slug: logger
 type: metrics
 status: beta
 ---
@@ -22,7 +23,7 @@ Prints aggregated metrics through the logger.
 # Config fields, showing default values
 metrics:
   logger:
-    push_interval: ""
+    push_interval: "" # No default (optional)
     flush_metrics: false
   mapping: ""
 ```
@@ -39,7 +40,6 @@ An optional period of time to continuously print all metrics.
 
 
 Type: `string`  
-Default: `""`  
 
 ### `flush_metrics`
 
