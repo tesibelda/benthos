@@ -105,9 +105,9 @@ func (r *AsyncReader) loop() {
 
 	pendingAcks := sync.WaitGroup{}
 	defer func() {
-		r.mgr.Logger().Debug("Waiting for pending acks to resolve before shutting down.")
+		r.mgr.Logger().Trace("Waiting for pending acks to resolve before shutting down.")
 		pendingAcks.Wait()
-		r.mgr.Logger().Debug("Pending acks resolved.")
+		r.mgr.Logger().Trace("Pending acks resolved.")
 	}()
 
 	initConnection := func() bool {
